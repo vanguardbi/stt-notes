@@ -94,7 +94,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content:
-                            Text('Signed in successfully! 🎉'),
+                            Text('Signed in successfully!'),
                           ),
                         );
                         // Example: navigate to home
