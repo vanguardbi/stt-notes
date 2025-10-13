@@ -8,8 +8,17 @@ import 'package:stt/screens/voice_recorder_page.dart';
 import 'package:flutter/services.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:stt/theme/color_scheme.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:stt/widget/auth_wrapper.dart';
+import 'firebase_options.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
   runApp(const MyApp());
 }
 
@@ -19,9 +28,9 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Voicerra',
+      title: 'STT Notes',
       debugShowCheckedModeBanner: false,
-      home: const MainPage(),
+      home: const AuthWrapper(),
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: lightColorScheme,
