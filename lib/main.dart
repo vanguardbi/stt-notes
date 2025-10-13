@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:stt/screens/add_child.dart';
+import 'package:stt/screens/add_session.dart';
+import 'package:stt/screens/children.dart';
+import 'package:stt/screens/home_stats.dart';
 import 'package:stt/screens/notes_page.dart';
+import 'package:stt/screens/recording.dart';
+import 'package:stt/screens/settings.dart';
 import 'package:stt/screens/voice.dart';
 import 'package:stt/screens/transcribe_page.dart';
 import 'package:stt/screens/voice_recorder_page.dart';
@@ -62,40 +68,40 @@ class MyApp extends StatelessWidget {
         ),
         textTheme: TextTheme(
           displayLarge: GoogleFonts.getFont(
-            'Raleway',
+            'Inter',
             fontSize: 24,
             fontWeight: FontWeight.bold,
-            color: const Color(0xa3ffffff),
+            // color: const Color(0xa3ffffff),
           ),
           titleMedium: GoogleFonts.getFont(
-            'Raleway',
+            'Inter',
             fontSize: 17,
             fontWeight: FontWeight.w500,
-            color: const Color(0xC5000000),
+            // color: const Color(0xC5000000),
           ),
           titleLarge: GoogleFonts.getFont(
-            'Raleway',
+            'Inter',
             fontSize: 24,
             fontWeight: FontWeight.w300,
-            color: const Color(0xFF777777),
+            // color: const Color(0xFF777777),
           ),
           titleSmall: GoogleFonts.getFont(
-            'Raleway',
+            'Inter',
             fontSize: 13,
             fontWeight: FontWeight.w500,
-            color: const Color(0xFF777777),
+            // color: const Color(0xFF777777),
           ),
           bodyLarge: GoogleFonts.getFont(
-            'Raleway',
+            'Inter',
             fontSize: 20,
             fontWeight: FontWeight.w500,
-            color: const Color(0xffd1ffeb),
+            // color: const Color(0xffd1ffeb),
           ),
           bodyMedium: GoogleFonts.getFont(
-            'Raleway',
+            'Inter',
             fontSize: 20,
             fontWeight: FontWeight.w500,
-            color: const Color(0xFF23262F),
+            // color: const Color(0xFF23262F),
           ),
         ),
       ),
@@ -114,7 +120,7 @@ class MyApp extends StatelessWidget {
           shape:
           RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           textStyle: GoogleFonts.getFont(
-            'Raleway',
+            'Inter',
             fontSize: 18,
             fontWeight: FontWeight.w600,
             color: Theme.of(context).colorScheme.onSecondary,
@@ -140,40 +146,40 @@ class MyApp extends StatelessWidget {
         ),
         textTheme: TextTheme(
           displayLarge: GoogleFonts.getFont(
-            'Raleway',
+            'Inter',
             fontSize: 24,
             fontWeight: FontWeight.bold,
-            color: const Color(0xa3ffffff),
+            // color: const Color(0xa3ffffff),
           ),
           titleMedium: GoogleFonts.getFont(
-            'Raleway',
+            'Inter',
             fontSize: 17,
             fontWeight: FontWeight.w500,
-            color: const Color(0xecffffff),
+            // color: const Color(0xecffffff),
           ),
           titleLarge: GoogleFonts.getFont(
-            'Raleway',
+            'Inter',
             fontSize: 24,
             fontWeight: FontWeight.w300,
-            color: const Color(0xFF777777),
+            // color: const Color(0xFF777777),
           ),
           titleSmall: GoogleFonts.getFont(
-            'Raleway',
+            'Inter',
             fontSize: 13,
             fontWeight: FontWeight.w500,
-            color: const Color(0xFF777777),
+            // color: const Color(0xFF777777),
           ),
           bodyLarge: GoogleFonts.getFont(
-            'Raleway',
+            'Inter',
             fontSize: 20,
             fontWeight: FontWeight.w500,
-            color: const Color(0xffd1ffeb),
+            // color: const Color(0xffd1ffeb),
           ),
           bodyMedium: GoogleFonts.getFont(
-            'Raleway',
+            'Inter',
             fontSize: 20,
             fontWeight: FontWeight.w500,
-            color: const Color(0xFF23262F),
+            // color: const Color(0xFF23262F),
           ),
         ),
       ),
@@ -192,18 +198,16 @@ class MainPage extends StatefulWidget {
 class _MainPageState extends State<MainPage> {
   int selectedIndex = 0;
   final List<Widget> screens = [
-    const VoiceApp(),
-    const TranscribePage(
-      title: 'Transcribe',
-    ),
-    const RecPage(),
-    const NotesPage(),
+    const HomeStats(),
+    const AddSessionScreen(),
+    const ChildrenListScreen(),
+    const SettingsScreen(),
   ];
   List<IconData> data = [
     Icons.home_outlined,
-    FluentIcons.mic_16_regular,
-    FluentIcons.record_12_regular,
-    Iconsax.note,
+    Icons.mic_none_outlined,
+    Icons.people_alt_outlined,
+    Icons.settings_outlined,
   ];
 
   @override

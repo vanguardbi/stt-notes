@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:stt/Screens/about_page.dart';
 import 'package:stt/Screens/continuous.dart';
 import 'package:stt/Screens/translate.dart';
@@ -96,6 +97,7 @@ class _VoiceAppState extends State<VoiceApp> {
     if (shouldLogout == true && mounted) {
       try {
         await FirebaseAuth.instance.signOut();
+        await GoogleSignIn().signOut();
         if (mounted) {
           Fluttertoast.showToast(
             msg: "✓   Logged out successfully",
@@ -125,7 +127,7 @@ class _VoiceAppState extends State<VoiceApp> {
         child: Stack(
           children: [
             MyAppBar(
-              title: 'Voicerra',
+              title: 'STT Notes',
               onIconTap: _listen,
               iconName: Iconsax.microphone,
             ),
