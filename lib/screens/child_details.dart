@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:stt/screens/session_details.dart';
+import 'package:stt/screens/sessions.dart';
 
-class ChildDetailsScreen extends StatelessWidget {
+class ChildDetailsScreen extends StatefulWidget {
   final String childId;
   final String childName;
 
@@ -12,18 +14,32 @@ class ChildDetailsScreen extends StatelessWidget {
   }) : super(key: key);
 
   @override
+  State<ChildDetailsScreen> createState() => _ChildDetailsScreenState();
+}
+
+class _ChildDetailsScreenState extends State<ChildDetailsScreen> {
+  String selectedTrack = 'All Tracks';
+  final List<String> tracks = ['Late Talking', 'Stuttering'];
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
-        backgroundColor: const Color(0xFFE0E0E0),
+        backgroundColor: const Color(0xFFFF5959),
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, color: Colors.black, size: 20),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else {
+              Navigator.pushReplacementNamed(context, '/home');
+            }
+          },
         ),
         title: Text(
-          childName,
+          widget.childName,
           style: const TextStyle(
             color: Colors.black,
             fontSize: 16,
@@ -39,7 +55,7 @@ class ChildDetailsScreen extends StatelessWidget {
       ),
       body: Column(
         children: [
-          // Track Section
+          // Track Dropdown Section
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Column(
@@ -56,35 +72,55 @@ class ChildDetailsScreen extends StatelessWidget {
                 const SizedBox(height: 8),
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: FutureBuilder<DocumentSnapshot>(
-                    future: FirebaseFirestore.instance
-                        .collection('children')
-                        .doc(childId)
-                        .get(),
-                    builder: (context, snapshot) {
-                      if (snapshot.hasData && snapshot.data!.exists) {
-                        var data = snapshot.data!.data() as Map<String, dynamic>;
-                        List tracks = data['tracks'] ?? [];
-                        return Row(
+                  child: DropdownButton<String>(
+                    isExpanded: true,
+                    value: selectedTrack,
+                    underline: const SizedBox(),
+                    icon: const Icon(Icons.arrow_drop_down, color: Colors.black54),
+                    items: [
+                      const DropdownMenuItem<String>(
+                        value: 'All Tracks',
+                        child: Row(
                           children: [
-                            const Icon(Icons.arrow_downward, size: 16, color: Colors.black54),
-                            const SizedBox(width: 8),
+                            Icon(Icons.filter_list, size: 16, color: Colors.black54),
+                            SizedBox(width: 8),
                             Text(
-                              tracks.isEmpty ? 'No track selected' : tracks.join(', '),
-                              style: const TextStyle(
+                              'All Tracks',
+                              style: TextStyle(
                                 fontSize: 14,
                                 color: Colors.black87,
                               ),
                             ),
                           ],
+                        ),
+                      ),
+                      ...tracks.map((String track) {
+                        return DropdownMenuItem<String>(
+                          value: track,
+                          child: Row(
+                            children: [
+                              const SizedBox(width: 8),
+                              Text(
+                                track,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                            ],
+                          ),
                         );
-                      }
-                      return const Text('Loading...');
+                      }).toList(),
+                    ],
+                    onChanged: (String? newValue) {
+                      setState(() {
+                        selectedTrack = newValue ?? 'All Tracks';
+                      });
                     },
                   ),
                 ),
@@ -95,11 +131,7 @@ class ChildDetailsScreen extends StatelessWidget {
           // Sessions List
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('sessions')
-                  .where('childId', isEqualTo: childId)
-                  .orderBy('createdAt', descending: true)
-                  .snapshots(),
+              stream: _getFilteredSessions(),
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
                   return Center(
@@ -130,7 +162,9 @@ class ChildDetailsScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          'No sessions yet',
+                          selectedTrack != 'All Tracks'
+                              ? 'No sessions for $selectedTrack'
+                              : 'No sessions yet',
                           style: TextStyle(
                             fontSize: 16,
                             color: Colors.grey[600],
@@ -197,6 +231,7 @@ class ChildDetailsScreen extends StatelessWidget {
                           onTap: () {
                             // Navigate to session details
                             print('Tapped on session: $track');
+                            Navigator.push(context, MaterialPageRoute(builder: (context) => SessionDetailsScreen(sessionId: snapshot.data!.docs[index].id,), ),);
                           },
                         ),
                       ),
@@ -207,18 +242,17 @@ class ChildDetailsScreen extends StatelessWidget {
             ),
           ),
 
-          // Save All Recordings Button
+          // Save All Sessions Button
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: SizedBox(
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () {
-                  // Handle save all recordings
-                  print('Save all recordings for $childName');
+                  Navigator.push(context, MaterialPageRoute(builder: (context) => const SessionsScreen()));
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFD0D0D0),
+                  backgroundColor: const Color(0xFF00C4B3),
                   foregroundColor: Colors.black87,
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(vertical: 16),
@@ -227,7 +261,7 @@ class ChildDetailsScreen extends StatelessWidget {
                   ),
                 ),
                 child: const Text(
-                  'Save All Recordings',
+                  'See All Sessions',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
@@ -239,5 +273,17 @@ class ChildDetailsScreen extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Stream<QuerySnapshot> _getFilteredSessions() {
+    Query query = FirebaseFirestore.instance
+        .collection('sessions')
+        .where('childId', isEqualTo: widget.childId);
+
+    if (selectedTrack != 'All Tracks') {
+      query = query.where('track', isEqualTo: selectedTrack);
+    }
+
+    return query.orderBy('createdAt', descending: true).snapshots();
   }
 }

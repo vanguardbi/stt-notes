@@ -1,18 +1,18 @@
 import 'dart:async';
 import 'dart:io';
-import 'package:ffmpeg_kit_flutter_new/ffmpeg_kit.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:vibration/vibration.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import 'package:flutter_sound/flutter_sound.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:stop_watch_timer/stop_watch_timer.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:flutter/services.dart';
+import 'package:google_speech/google_speech.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:google_speech/google_speech.dart';
+import 'package:flutter/services.dart';
 
 class RecordingSessionScreen extends StatefulWidget {
   final String childId;
@@ -35,12 +35,12 @@ class RecordingSessionScreen extends StatefulWidget {
 }
 
 class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
-  late FlutterSoundPlayer _audioPlayer;
-  late FlutterSoundRecorder _recordingSession;
+  FlutterSoundPlayer? audioPlayer = FlutterSoundPlayer();
+  FlutterSoundRecorder? _mRecorder = FlutterSoundRecorder();
   final StopWatchTimer _stopWatchTimer = StopWatchTimer();
 
-  final Codec _codec = Codec.aacADTS;
-  final String _fileExtension = 'aac';
+  final Codec _codec = Codec.pcm16WAV;
+  final String _fileExtension = 'wav';
 
   // Recording stages
   RecordingStage _currentStage = RecordingStage.initial;
@@ -53,37 +53,18 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
   @override
   void initState() {
     super.initState();
-    _initializeRecorder();
-  }
-
-  Future<void> _initializeRecorder() async {
-    _audioPlayer = FlutterSoundPlayer();
-    _recordingSession = FlutterSoundRecorder();
-
-    await Permission.microphone.request();
-    await _audioPlayer.openPlayer();
-    await _recordingSession.openRecorder();
-    final isSupported = await _recordingSession.isEncoderSupported(Codec.pcm16WAV);
-    print('Recorder initialized: WAV supported? $isSupported');
+    openTheRecorder();
+    audioPlayer!.openPlayer();
   }
 
   @override
   void dispose() async {
-    await _stopWatchTimer.dispose();
-    await _audioPlayer.closePlayer();
-    await _recordingSession.closeRecorder();
+    audioPlayer!.closePlayer();
+    audioPlayer = null;
+    _mRecorder!.closeRecorder();
+    _mRecorder = null;
+    _stopWatchTimer.dispose();
     super.dispose();
-  }
-
-  Future<void> _checkMicPermission() async {
-    var status = await Permission.microphone.status;
-    print('status, $status');
-    if (!status.isGranted) {
-      status = await Permission.microphone.request();
-    }
-    if (!status.isGranted) {
-      throw Exception('Microphone permission not granted');
-    }
   }
 
   Future<void> openTheRecorder() async {
@@ -91,6 +72,7 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
     if (status != PermissionStatus.granted) {
       throw Exception('Microphone permission denied');
     }
+    await _mRecorder!.openRecorder();
   }
 
   Future<Directory> getDirectory() async {
@@ -98,42 +80,28 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
   }
 
   void startRecording() async {
-    try {
-      await _checkMicPermission();
-      Directory applicationDirectory = await getDirectory();
-      bool? canVibrate = await Vibration.hasVibrator();
+    Directory applicationDirectory = await getDirectory();
+    bool? canVibrate = await Vibration.hasVibrator();
 
-      String filePath = '${applicationDirectory.path}/recording_${DateTime.now().millisecondsSinceEpoch}.$_fileExtension';
-
-      await _recordingSession.startRecorder(
-        toFile: filePath,
-        codec: _codec,
-        audioSource: AudioSource.microphone,
-        sampleRate: 16000,
-      );
-      await Future.delayed(const Duration(milliseconds: 500));
-
+    _mRecorder!
+        .startRecorder(
+      toFile: '${applicationDirectory.path}/temp.$_fileExtension',
+      codec: _codec,
+    )
+        .then((_) async {
       _stopWatchTimer.onStartTimer();
       await WakelockPlus.enable();
       if (canVibrate == true) {
         Vibration.vibrate(duration: 100);
       }
-
       setState(() {
         _currentStage = RecordingStage.recording;
-        _recordedFilePath = filePath;
       });
-    } catch (e) {
-      print('Error starting recording: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-      );
-    }
+    });
   }
 
   void pauseRecording() async {
-    try {
-      await _recordingSession.pauseRecorder();
+    await _mRecorder!.pauseRecorder().then((_) async {
       bool? canVibrate = await Vibration.hasVibrator();
       if (canVibrate == true) {
         Vibration.vibrate(duration: 100);
@@ -142,14 +110,11 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
         _stopWatchTimer.onStopTimer();
       });
       await WakelockPlus.disable();
-    } catch (e) {
-      print('Error pausing recording: $e');
-    }
+    });
   }
 
   void resumeRecording() async {
-    try {
-      await _recordingSession.resumeRecorder();
+    await _mRecorder!.resumeRecorder().then((_) async {
       bool? canVibrate = await Vibration.hasVibrator();
       if (canVibrate == true) {
         Vibration.vibrate(duration: 100);
@@ -158,14 +123,11 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
         _stopWatchTimer.onStartTimer();
       });
       await WakelockPlus.enable();
-    } catch (e) {
-      print('Error resuming recording: $e');
-    }
+    });
   }
 
   void stopRecording() async {
-    try {
-      await _recordingSession.stopRecorder();
+    await _mRecorder!.stopRecorder().then((value) async {
       bool? canVibrate = await Vibration.hasVibrator();
       if (canVibrate == true) {
         Vibration.vibrate(duration: 100);
@@ -173,17 +135,20 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
 
       _recordingDuration = _stopWatchTimer.rawTime.value;
 
+      Directory applicationDirectory = await getDirectory();
+      File audioFile = File('${applicationDirectory.path}/temp.$_fileExtension');
+
+      final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
+      final fileName = '${widget.childName}_$timestamp';
+      final renamedFile = await audioFile.rename('${applicationDirectory.path}/$fileName.$_fileExtension');
+
       await WakelockPlus.disable();
 
       setState(() {
+        _recordedFilePath = renamedFile.path;
         _currentStage = RecordingStage.recordingComplete;
       });
-    } catch (e) {
-      print('Error stopping recording: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-      );
-    }
+    });
   }
 
   Future<void> generateTranscript() async {
@@ -212,17 +177,7 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
         languageCode: 'en-US',
       );
 
-      final inputPath = _recordedFilePath!;
-      final outputPath = inputPath.replaceAll('.aac', '.wav');
-
-      await FFmpegKit.execute(
-          '-y -i ${_recordedFilePath!} -ac 1 -ar 16000 -acodec pcm_s16le -af loudnorm ${_recordedFilePath!.replaceAll(".aac", ".wav")}'
-      );
-      _recordedFilePath = outputPath;
-      print('Converted to WAV: ${await File(outputPath).length()} bytes');
-
       final audioBytes = File(_recordedFilePath!).readAsBytesSync().toList();
-      print('Audio data size (bytes): ${audioBytes.length}');
       final response = await speechToText.recognize(config, audioBytes);
       print('response: $response');
 
@@ -247,15 +202,7 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
 
   Future<void> saveSessionToFirestore() async {
     try {
-      final user = FirebaseAuth.instance.currentUser;
-
-      if (user == null) {
-        throw Exception('No user logged in');
-      }
-
-      final docRef = FirebaseFirestore.instance.collection('sessions').doc();
-      await docRef.set({
-        'id': docRef.id,
+      await FirebaseFirestore.instance.collection('sessions').add({
         'childId': widget.childId,
         'childName': widget.childName,
         'parentName': widget.parentName,
@@ -264,7 +211,6 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
         'audioUrl': _downloadURL,
         'duration': _recordingDuration,
         'transcript': _transcriptText ?? '',
-        'createdBy': user.uid,
         'createdAt': FieldValue.serverTimestamp(),
       });
 
@@ -287,7 +233,7 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
-        backgroundColor: const Color(0xFFFF5959),
+        backgroundColor: const Color(0xFFE0E0E0),
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, color: Colors.black, size: 20),
@@ -382,8 +328,8 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
 
   // Stage 2: Recording View
   Widget _buildRecordingView() {
-    final isRecording = _recordingSession.isRecording;
-    final isPaused = _recordingSession.isPaused;
+    final isRecording = _mRecorder?.isRecording ?? false;
+    final isPaused = _mRecorder?.isPaused ?? false;
 
     return Center(
       child: Padding(
@@ -645,16 +591,10 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: () async {
+                onPressed: () {
                   // Play audio
                   if (_recordedFilePath != null) {
-                    try {
-                      await _audioPlayer.startPlayer(fromURI: _recordedFilePath!);
-                    } catch (e) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Error playing audio: $e'), backgroundColor: Colors.red),
-                      );
-                    }
+                    audioPlayer!.startPlayer(fromURI: _recordedFilePath!);
                   }
                 },
                 style: ElevatedButton.styleFrom(

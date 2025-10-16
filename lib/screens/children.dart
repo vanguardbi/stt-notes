@@ -2,20 +2,34 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:stt/screens/add_child.dart';
 import 'package:stt/screens/child_details.dart';
+import 'package:stt/screens/sessions.dart';
 
-class ChildrenListScreen extends StatelessWidget {
+class ChildrenListScreen extends StatefulWidget {
   const ChildrenListScreen({Key? key}) : super(key: key);
+
+  @override
+  State<ChildrenListScreen> createState() => _ChildrenListScreenState();
+}
+
+class _ChildrenListScreenState extends State<ChildrenListScreen> {
+  String _searchQuery = '';
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
-        backgroundColor: const Color(0xFFE0E0E0),
+        backgroundColor: const Color(0xFFFF5959),
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, color: Colors.black, size: 20),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else {
+              Navigator.pushReplacementNamed(context, '/home');
+            }
+          },
         ),
         title: const Text(
           'Children',
@@ -46,6 +60,15 @@ class ChildrenListScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: TextField(
+                style: const TextStyle(
+                  fontSize: 14,
+                ),
+                cursorColor: Colors.black,
+                onChanged: (value) {
+                  setState(() {
+                    _searchQuery = value.toLowerCase();
+                  });
+                },
                 decoration: InputDecoration(
                   hintText: 'Search',
                   hintStyle: TextStyle(
@@ -118,11 +141,44 @@ class ChildrenListScreen extends StatelessWidget {
                   );
                 }
 
+                // Filter the documents based on search query (client-side filtering)
+                final filteredDocs = _searchQuery.isEmpty
+                    ? snapshot.data!.docs
+                    : snapshot.data!.docs.where((doc) {
+                  var childData = doc.data() as Map<String, dynamic>;
+                  String childName = (childData['childName'] ?? '').toString().toLowerCase();
+                  return childName.contains(_searchQuery);
+                }).toList();
+
+                // Show message if no results found after filtering
+                if (filteredDocs.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.search_off,
+                          size: 64,
+                          color: Colors.grey[400],
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No children found',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
                 return ListView.builder(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: snapshot.data!.docs.length,
+                  itemCount: filteredDocs.length,
                   itemBuilder: (context, index) {
-                    var childData = snapshot.data!.docs[index].data() as Map<String, dynamic>;
+                    var childData = filteredDocs[index].data() as Map<String, dynamic>;
                     String childName = childData['childName'] ?? 'Unknown';
                     Timestamp? timestamp = childData['createdAt'];
                     String dateStr = '';
@@ -177,7 +233,7 @@ class ChildrenListScreen extends StatelessWidget {
                               context,
                               MaterialPageRoute(
                                 builder: (context) => ChildDetailsScreen(
-                                  childId: snapshot.data!.docs[index].id,
+                                  childId: filteredDocs[index].id,
                                   childName: childName,
                                 ),
                               ),
@@ -192,18 +248,17 @@ class ChildrenListScreen extends StatelessWidget {
             ),
           ),
 
-          // Save All Recordings Button
+          // Save All Sessions Button
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: SizedBox(
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () {
-                  // Handle save all recordings
-                  print('Save all recordings');
+                  Navigator.push(context, MaterialPageRoute(builder: (context) => const SessionsScreen()));
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFD0D0D0),
+                  backgroundColor: const Color(0xFF00C4B3),
                   foregroundColor: Colors.black87,
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(vertical: 16),
@@ -212,7 +267,7 @@ class ChildrenListScreen extends StatelessWidget {
                   ),
                 ),
                 child: const Text(
-                  'Save All Recordings',
+                  'See All Sessions',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,

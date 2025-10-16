@@ -1,5 +1,7 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:stt/screens/children.dart';
 
 class AddChildScreen extends StatefulWidget {
   const AddChildScreen({Key? key}) : super(key: key);
@@ -43,12 +45,21 @@ class _AddChildScreenState extends State<AddChildScreen> {
         _isSaving = true;
       });
 
+      final user = FirebaseAuth.instance.currentUser;
+
+      if (user == null) {
+        throw Exception('No user logged in');
+      }
+
       try {
-        await FirebaseFirestore.instance.collection('children').add({
+        final docRef = FirebaseFirestore.instance.collection('children').doc();
+        await docRef.set({
+          'id': docRef.id,
           'childName': _childNameController.text.trim(),
           'parentName': _parentNameController.text.trim(),
           'tracks': _selectedTracks,
           'notes': _notesController.text.trim(),
+          'createdBy': user.uid,
           'createdAt': FieldValue.serverTimestamp(),
         });
 
@@ -65,6 +76,10 @@ class _AddChildScreenState extends State<AddChildScreen> {
 
         // Navigate back
         // Navigator.pop(context);
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const ChildrenListScreen()),
+        );
       } catch (e) {
         if (!mounted) return;
 
@@ -89,13 +104,19 @@ class _AddChildScreenState extends State<AddChildScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
-        backgroundColor: const Color(0xFFE0E0E0),
+        backgroundColor: const Color(0xFFFF5959),
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, color: Colors.black, size: 20),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else {
+              Navigator.pushReplacementNamed(context, '/home');
+            }
+          },
         ),
         title: const Text(
           'New Child',
@@ -136,6 +157,10 @@ class _AddChildScreenState extends State<AddChildScreen> {
                   ),
                   child: TextFormField(
                     controller: _childNameController,
+                    style: const TextStyle(
+                      fontSize: 14,
+                    ),
+                    cursorColor: Colors.black,
                     validator: (value) {
                       if (value == null || value.trim().isEmpty) {
                         return 'Please enter child\'s name';
@@ -186,6 +211,10 @@ class _AddChildScreenState extends State<AddChildScreen> {
                   ),
                   child: TextFormField(
                     controller: _parentNameController,
+                    style: const TextStyle(
+                      fontSize: 14,
+                    ),
+                    cursorColor: Colors.black,
                     validator: (value) {
                       if (value == null || value.trim().isEmpty) {
                         return 'Please enter parent\'s name';
@@ -257,6 +286,10 @@ class _AddChildScreenState extends State<AddChildScreen> {
                   ),
                   child: TextField(
                     controller: _notesController,
+                    style: const TextStyle(
+                      fontSize: 14,
+                    ),
+                    cursorColor: Colors.black,
                     maxLines: 8,
                     decoration: InputDecoration(
                       hintText: '',
@@ -275,7 +308,7 @@ class _AddChildScreenState extends State<AddChildScreen> {
                   child: ElevatedButton(
                     onPressed: _isSaving ? null : _saveChild,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFD0D0D0),
+                      backgroundColor: const Color(0xFF00C4B3),
                       foregroundColor: Colors.black87,
                       disabledBackgroundColor: const Color(0xFFE8E8E8),
                       disabledForegroundColor: Colors.black38,

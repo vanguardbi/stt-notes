@@ -1,12 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:stt/Screens/about_page.dart';
-import 'package:stt/Screens/continuous.dart';
-import 'package:stt/Screens/translate.dart';
-import 'package:fluttertoast/fluttertoast.dart';
-import 'package:iconsax/iconsax.dart';
-import 'package:stt/widget/more_options_card_widget.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({Key? key}) : super(key: key);
@@ -17,17 +12,21 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   String? _userEmail;
+  String? _userName;
+  String? _userPhotoUrl;
 
   @override
   void initState() {
     super.initState();
-    _getUserEmail();
+    _getUserInfo();
   }
 
-  void _getUserEmail() {
+  void _getUserInfo() {
     final user = FirebaseAuth.instance.currentUser;
     setState(() {
       _userEmail = user?.email;
+      _userName = user?.displayName ?? 'User';
+      _userPhotoUrl = user?.photoURL;
     });
   }
 
@@ -65,7 +64,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xff006a53),
+              backgroundColor: const Color(0xFF00C4B3),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
@@ -88,10 +87,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         await GoogleSignIn().signOut();
         if (mounted) {
           Fluttertoast.showToast(
-            msg: "✓   Logged out successfully",
+            msg: "Logged out successfully",
             toastLength: Toast.LENGTH_SHORT,
           );
-          // Add navigation to login screen here if needed
         }
       } catch (e) {
         if (mounted) {
@@ -110,79 +108,153 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
-      // Removed AppBar and replaced with a simple Column in the body
+      appBar: AppBar(
+        backgroundColor: const Color(0xFFFF5959),
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios, color: Colors.black, size: 20),
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else {
+              Navigator.pushReplacementNamed(context, '/home');
+            }
+          },
+        ),
+        title: Text(
+          'Profile',
+          style: const TextStyle(
+            color: Colors.black,
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.menu, color: Colors.black),
+            onPressed: () {},
+          ),
+        ],
+      ),
       body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Padding(
-              padding: EdgeInsets.only(left: 20.0, top: 40.0, bottom: 20.0),
-              child: Text(
-                'STT Notes',
-                style: TextStyle(
-                  fontSize: 32.0,
-                  fontFamily: 'Inter',
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-
-            // --- User Email Display and Logout ---
-            if (_userEmail != null)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 32),
+            child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
                 child: Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
+                    horizontal: 24,
+                    vertical: 32,
                   ),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.onSecondary,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: const Color(0xff006a53).withOpacity(0.3),
-                    ),
-                  ),
-                  child: Row(
+                  // decoration: BoxDecoration(
+                  //   color: Theme.of(context).colorScheme.onSecondary,
+                  //   borderRadius: BorderRadius.circular(20),
+                  //   boxShadow: [
+                  //     BoxShadow(
+                  //       color: Colors.black.withOpacity(0.05),
+                  //       blurRadius: 10,
+                  //       offset: const Offset(0, 4),
+                  //     ),
+                  //   ],
+                  // ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
+                      // --- Profile Photo ---
                       Container(
-                        padding: const EdgeInsets.all(8),
+                        width: 100,
+                        height: 100,
                         decoration: BoxDecoration(
-                          color: const Color(0xff006a53).withOpacity(0.1),
                           shape: BoxShape.circle,
+                          color: const Color(0xff006a53).withOpacity(0.1),
+                          border: Border.all(
+                            color: const Color(0xff006a53).withOpacity(0.2),
+                            width: 2,
+                          ),
                         ),
-                        child: const Icon(
-                          Icons.person,
-                          color: Color(0xff006a53),
-                          size: 20,
+                        child: _userPhotoUrl != null
+                            ? ClipOval(
+                          child: Image.network(
+                            _userPhotoUrl!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Center(
+                                child: Icon(
+                                  Icons.person,
+                                  size: 50,
+                                  color: const Color(0xff006a53),
+                                ),
+                              );
+                            },
+                          ),
+                        )
+                            : Center(
+                          child: Icon(
+                            Icons.person,
+                            size: 50,
+                            color: const Color(0xff006a53),
+                          ),
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          _userEmail!,
-                          style: TextStyle(
-                            fontFamily: 'Inter',
-                            fontSize: 14,
-                            color: Theme.of(context).colorScheme.onBackground,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          overflow: TextOverflow.ellipsis,
+                      const SizedBox(height: 16),
+                      // --- User Name ---
+                      Text(
+                        _userName ?? 'User',
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontFamily: 'Inter',
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      GestureDetector(
-                        onTap: _handleLogout,
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.red.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(10),
+                      const SizedBox(height: 8),
+                      // --- User Email ---
+                      Text(
+                        _userEmail ?? 'No email',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontFamily: 'Inter',
+                          fontWeight: FontWeight.w400,
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onBackground
+                              .withOpacity(0.7),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      // --- Logout Button ---
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: _handleLogout,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Color(0xFF00C4B3),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
                           ),
-                          child: const Icon(
-                            Icons.logout,
-                            color: Colors.red,
-                            size: 20,
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.logout,
+                                color: Colors.white,
+                                size: 18,
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                'Log Out',
+                                style: TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -190,11 +262,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ),
               ),
-
-            const SizedBox(height: 30),
-
-            const Spacer(),
-          ],
+              const SizedBox(height: 40),
+            ],
+          ),
+          )
         ),
       ),
     );

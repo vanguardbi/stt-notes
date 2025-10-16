@@ -8,6 +8,7 @@ import 'package:stt/screens/home_stats.dart';
 import 'package:stt/screens/notes_page.dart';
 import 'package:stt/screens/recording.dart';
 import 'package:stt/screens/settings.dart';
+import 'package:stt/screens/test_rec.dart';
 import 'package:stt/screens/voice.dart';
 import 'package:stt/screens/transcribe_page.dart';
 import 'package:stt/screens/voice_recorder_page.dart';
@@ -17,9 +18,12 @@ import 'package:stt/theme/color_scheme.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:stt/widget/auth_wrapper.dart';
 import 'firebase_options.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  final WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
+
+  // FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
 
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
@@ -37,6 +41,9 @@ class MyApp extends StatelessWidget {
       title: 'STT Notes',
       debugShowCheckedModeBanner: false,
       home: const AuthWrapper(),
+      routes: {
+        '/home': (context) => const MainPage(),
+      },
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: lightColorScheme,
@@ -73,13 +80,13 @@ class MyApp extends StatelessWidget {
             fontWeight: FontWeight.bold,
             // color: const Color(0xa3ffffff),
           ),
-          titleMedium: GoogleFonts.getFont(
+          displayMedium: GoogleFonts.getFont(
             'Inter',
             fontSize: 17,
             fontWeight: FontWeight.w500,
             // color: const Color(0xC5000000),
           ),
-          titleLarge: GoogleFonts.getFont(
+          titleMedium: GoogleFonts.getFont(
             'Inter',
             fontSize: 24,
             fontWeight: FontWeight.w300,
@@ -151,13 +158,13 @@ class MyApp extends StatelessWidget {
             fontWeight: FontWeight.bold,
             // color: const Color(0xa3ffffff),
           ),
-          titleMedium: GoogleFonts.getFont(
+          displayMedium: GoogleFonts.getFont(
             'Inter',
             fontSize: 17,
             fontWeight: FontWeight.w500,
             // color: const Color(0xecffffff),
           ),
-          titleLarge: GoogleFonts.getFont(
+          titleMedium: GoogleFonts.getFont(
             'Inter',
             fontSize: 24,
             fontWeight: FontWeight.w300,
@@ -220,13 +227,14 @@ class _MainPageState extends State<MainPage> {
     );
     SystemChrome.setSystemUIOverlayStyle(style);
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.onSecondary,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       bottomNavigationBar: Padding(
         padding: const EdgeInsets.only(left: 20, right: 20, bottom: 20),
         child: Material(
-          elevation: 10,
+          // elevation: 16,
+          shadowColor: Colors.black.withOpacity(0.3),
           borderRadius: BorderRadius.circular(20),
-          color: Theme.of(context).colorScheme.outline,
+          color: const Color(0xFFD0D0D0),
           child: SizedBox(
             height: 70,
             width: double.infinity,
