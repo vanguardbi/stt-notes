@@ -88,13 +88,19 @@ class _AddSessionScreenState extends State<AddSessionScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
-        backgroundColor: const Color(0xFFE0E0E0),
+        backgroundColor: const Color(0xFFFF5959),
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, color: Colors.black, size: 20),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else {
+              Navigator.pushReplacementNamed(context, '/home');
+            }
+          },
         ),
         title: const Text(
           'New Session',
@@ -147,12 +153,14 @@ class _AddSessionScreenState extends State<AddSessionScreen> {
                   )
                       : DropdownButtonFormField<String>(
                     value: _selectedChildId,
-                    decoration: InputDecoration(
-                      hintText: 'Micah Karuki',
-                      hintStyle: TextStyle(
+                    hint: Text(
+                      'Select a child',
+                      style: TextStyle(
                         color: Colors.grey[400],
                         fontSize: 14,
                       ),
+                    ),
+                    decoration: InputDecoration(
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                         borderSide: BorderSide.none,
@@ -165,6 +173,7 @@ class _AddSessionScreenState extends State<AddSessionScreen> {
                         horizontal: 16,
                         vertical: 14,
                       ),
+                      isDense: true,
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
@@ -210,6 +219,10 @@ class _AddSessionScreenState extends State<AddSessionScreen> {
                   ),
                   child: TextFormField(
                     controller: _parentNameController,
+                    style: const TextStyle(
+                      fontSize: 14,
+                    ),
+                    cursorColor: Colors.black,
                     validator: (value) {
                       if (value == null || value.trim().isEmpty) {
                         return 'Please enter parent\'s name';
@@ -256,12 +269,14 @@ class _AddSessionScreenState extends State<AddSessionScreen> {
                   ),
                   child: DropdownButtonFormField<String>(
                     value: _selectedTrack,
-                    decoration: InputDecoration(
-                      hintText: 'Late Talking',
-                      hintStyle: TextStyle(
+                    hint: Text(
+                      'Select track',
+                      style: TextStyle(
                         color: Colors.grey[400],
                         fontSize: 14,
                       ),
+                    ),
+                    decoration: InputDecoration(
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                         borderSide: BorderSide.none,
@@ -274,6 +289,7 @@ class _AddSessionScreenState extends State<AddSessionScreen> {
                         horizontal: 16,
                         vertical: 14,
                       ),
+                      isDense: true,
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
@@ -316,6 +332,10 @@ class _AddSessionScreenState extends State<AddSessionScreen> {
                   ),
                   child: TextField(
                     controller: _notesController,
+                    style: const TextStyle(
+                      fontSize: 14,
+                    ),
+                    cursorColor: Colors.black,
                     maxLines: 8,
                     decoration: InputDecoration(
                       hintText: '',
@@ -335,7 +355,7 @@ class _AddSessionScreenState extends State<AddSessionScreen> {
                   child: ElevatedButton(
                     onPressed: _isSaving ? null : _startSession,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFD0D0D0),
+                      backgroundColor: const Color(0xFF00C4B3),
                       foregroundColor: Colors.black87,
                       disabledBackgroundColor: const Color(0xFFE8E8E8),
                       disabledForegroundColor: Colors.black38,

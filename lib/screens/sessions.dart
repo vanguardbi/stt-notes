@@ -1,30 +1,70 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:stt/screens/add_session.dart';
 import 'package:stt/screens/session_details.dart';
-import 'package:stt/screens/sessions.dart';
 
-class HomeStats extends StatelessWidget {
-  const HomeStats({Key? key}) : super(key: key);
+class SessionsScreen extends StatefulWidget {
+  const SessionsScreen({Key? key}) : super(key: key);
 
-  String _getGreeting() {
-    final hour = DateTime.now().hour;
-    if (hour < 12) {
-      return 'Good Morning';
-    } else if (hour < 17) {
-      return 'Good Afternoon';
-    } else {
-      return 'Good Evening';
+  @override
+  State<SessionsScreen> createState() => _SessionsScreenState();
+}
+
+class _SessionsScreenState extends State<SessionsScreen> {
+  String _selectedChildId = 'all';
+  String _selectedChildName = 'All Children';
+  Map<String, String> _childrenMap = {}; // Map of id -> childName
+  bool _isLoadingChildren = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchChildren();
+  }
+
+  Future<void> _fetchChildren() async {
+    try {
+      // Fetch all children from the children collection
+      QuerySnapshot childrenSnapshot = await FirebaseFirestore.instance
+          .collection('children')
+          .get();
+
+      Map<String, String> childrenMap = {};
+      for (var doc in childrenSnapshot.docs) {
+        var data = doc.data() as Map<String, dynamic>;
+        String childId = doc.id; // Document ID
+        String childName = data['childName'] ?? 'Unknown Child';
+        childrenMap[childId] = childName;
+      }
+
+      setState(() {
+        _childrenMap = childrenMap;
+        _isLoadingChildren = false;
+      });
+    } catch (e) {
+      print('Error fetching children: $e');
+      setState(() {
+        _isLoadingChildren = false;
+      });
     }
   }
 
-  String _getUserName() {
-    User? user = FirebaseAuth.instance.currentUser;
-    if (user != null && user.displayName != null) {
-      return user.displayName!.split(' ').first; // Get first name
+  Stream<QuerySnapshot> _getSessionsStream() {
+    if (_selectedChildId == 'all') {
+      return FirebaseFirestore.instance
+          .collection('sessions')
+          .orderBy('createdAt', descending: true)
+          .snapshots();
+    } else {
+      return FirebaseFirestore.instance
+          .collection('sessions')
+          .where('childId', isEqualTo: _selectedChildId)
+          .orderBy('createdAt', descending: true)
+          .snapshots();
     }
-    return 'User';
+  }
+
+  String _getChildNameById(String childId) {
+    return _childrenMap[childId] ?? 'Unknown Child';
   }
 
   @override
@@ -34,79 +74,85 @@ class HomeStats extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: const Color(0xFFFF5959),
         elevation: 0,
-        title: Text(
-          '${_getGreeting()}, ${_getUserName()}',
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          'Sessions',
           style: TextStyle(
             color: Colors.black,
             fontSize: 16,
             fontWeight: FontWeight.w500,
           ),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.menu, color: Colors.black),
-            onPressed: () {},
-          ),
-        ],
       ),
       body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Record a Session Button
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 32.0, horizontal: 16.0),
-            child: SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  // Navigate to create session page
-                  Navigator.push(context, MaterialPageRoute(builder: (context) => const AddSessionScreen()));
+          // Dropdown Filter
+          Container(
+            padding: const EdgeInsets.all(16),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey[300]!),
+              ),
+              child: _isLoadingChildren
+                  ? const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Center(
+                  child: SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.black54),
+                    ),
+                  ),
+                ),
+              )
+                  : DropdownButton<String>(
+                value: _selectedChildId,
+                isExpanded: true,
+                underline: const SizedBox(),
+                icon: const Icon(Icons.arrow_drop_down, color: Colors.black87),
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black87,
+                ),
+                items: [
+                  const DropdownMenuItem<String>(
+                    value: 'all',
+                    child: Text('All Children'),
+                  ),
+                  ..._childrenMap.entries.map((entry) {
+                    return DropdownMenuItem<String>(
+                      value: entry.key,
+                      child: Text(entry.value),
+                    );
+                  }).toList(),
+                ],
+                onChanged: (String? newValue) {
+                  if (newValue != null) {
+                    setState(() {
+                      _selectedChildId = newValue;
+                      _selectedChildName = newValue == 'all'
+                          ? 'All Children'
+                          : _childrenMap[newValue] ?? 'Unknown Child';
+                    });
+                  }
                 },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF00C4B3),
-                  foregroundColor: Colors.black87,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: const Text(
-                  'Record a Session',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
               ),
             ),
           ),
 
-          const SizedBox(height: 12),
-
-          // Recent Sessions Header
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16.0),
-            child: Text(
-              'Recent Sessions',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: Colors.black87,
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 12),
-
-          // Last 5 Sessions List
+          // Sessions List
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('sessions')
-                  .orderBy('createdAt', descending: true)
-                  .limit(5)
-                  .snapshots(),
+              stream: _getSessionsStream(),
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
                   return Center(
@@ -137,7 +183,9 @@ class HomeStats extends StatelessWidget {
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          'No sessions yet',
+                          _selectedChildId == 'all'
+                              ? 'No sessions yet'
+                              : 'No sessions for $_selectedChildName',
                           style: TextStyle(
                             fontSize: 16,
                             color: Colors.grey[600],
@@ -161,7 +209,8 @@ class HomeStats extends StatelessWidget {
                   itemCount: snapshot.data!.docs.length,
                   itemBuilder: (context, index) {
                     var sessionData = snapshot.data!.docs[index].data() as Map<String, dynamic>;
-                    String childName = sessionData['childName'] ?? 'Unknown Child';
+                    String childId = sessionData['childId'] ?? '';
+                    String childName = _getChildNameById(childId);
                     Timestamp? timestamp = sessionData['createdAt'];
                     String dateStr = '';
 
@@ -217,36 +266,6 @@ class HomeStats extends StatelessWidget {
                   },
                 );
               },
-            ),
-          ),
-
-          // See All Sessions Button
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  // Navigate to all sessions
-                  Navigator.push(context, MaterialPageRoute(builder: (context) => const SessionsScreen()));
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF00C4B3),
-                  foregroundColor: Colors.black87,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: const Text(
-                  'See All Sessions',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
             ),
           ),
         ],

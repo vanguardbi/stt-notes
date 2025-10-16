@@ -73,6 +73,9 @@ dependencies:
   sound_stream:
     path: ./packages/sound_stream
   firebase_storage: ^13.0.2
+  http: ^1.5.0
+  ffmpeg_kit_flutter_new: ^3.2.0
+  flutter_native_splash: ^2.4.4
 
 dev_dependencies:
   flutter_test:
@@ -101,6 +104,7 @@ flutter:
   #   - images/a_dot_burr.jpeg
   #   - images/a_dot_ham.jpeg
   assets:
+    - assets/logo/
     - assets/images/
     - assets/cloud.json
 

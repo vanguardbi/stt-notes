@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -38,6 +39,25 @@ class _LoginScreenState extends State<LoginScreen> {
       final userCredential =
       await FirebaseAuth.instance.signInWithCredential(credential);
 
+      if (userCredential.user != null) {
+        final uid = userCredential.user!.uid;
+        final userDoc = FirebaseFirestore.instance.collection('users').doc(uid);
+
+        // Check if user document exists
+        final docSnapshot = await userDoc.get();
+
+        if (!docSnapshot.exists) {
+          // Create new user document
+          await userDoc.set({
+            'id': uid,
+            'email': userCredential.user!.email,
+            'displayName': userCredential.user!.displayName,
+            'photoURL': userCredential.user!.photoURL,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+        }
+      }
+
       setState(() => _isSigningIn = false);
       return userCredential;
     } catch (e) {
@@ -61,12 +81,12 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Profile placeholder
                 const CircleAvatar(
                   radius: 48,
                   backgroundColor: Colors.grey,
-                  child: Icon(Icons.person, color: Colors.white, size: 48),
+                  backgroundImage: AssetImage('assets/logo/sttlogo.png'),
                 ),
+
                 const SizedBox(height: 20),
 
                 // App name
@@ -102,7 +122,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       }
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.grey[300],
+                      backgroundColor: Color(0xFF00C4B3),
                       elevation: 0,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
