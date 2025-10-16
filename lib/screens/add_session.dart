@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:stt/screens/recording.dart';
+import 'package:stt/widget/custom_button.dart';
 
 class AddSessionScreen extends StatefulWidget {
   const AddSessionScreen({Key? key}) : super(key: key);
@@ -349,40 +350,8 @@ class _AddSessionScreenState extends State<AddSessionScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                // Save All Recordings Button
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: _isSaving ? null : _startSession,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF00C4B3),
-                      foregroundColor: Colors.black87,
-                      disabledBackgroundColor: const Color(0xFFE8E8E8),
-                      disabledForegroundColor: Colors.black38,
-                      elevation: 0,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: _isSaving
-                        ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.black54),
-                      ),
-                    )
-                        : const Text(
-                      'Start Session',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ),
+                // Save Session Button
+                CustomButton(text: 'Start Session', onPressed: _startSession, isLoading: _isSaving,),
               ],
             ),
           ),

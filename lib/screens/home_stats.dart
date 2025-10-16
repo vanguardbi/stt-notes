@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:stt/screens/add_session.dart';
 import 'package:stt/screens/session_details.dart';
 import 'package:stt/screens/sessions.dart';
+import 'package:stt/widget/custom_button.dart';
 
 class HomeStats extends StatelessWidget {
   const HomeStats({Key? key}) : super(key: key);
@@ -55,30 +56,11 @@ class HomeStats extends StatelessWidget {
           // Record a Session Button
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 32.0, horizontal: 16.0),
-            child: SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  // Navigate to create session page
-                  Navigator.push(context, MaterialPageRoute(builder: (context) => const AddSessionScreen()));
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF00C4B3),
-                  foregroundColor: Colors.black87,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: const Text(
-                  'Record a Session',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
+            child: CustomButton(
+              text: 'Record a Session',
+              onPressed: () {
+                Navigator.push(context, MaterialPageRoute(builder: (context) => const AddSessionScreen()));
+              }
             ),
           ),
 
@@ -225,28 +207,12 @@ class HomeStats extends StatelessWidget {
             padding: const EdgeInsets.all(16.0),
             child: SizedBox(
               width: double.infinity,
-              child: ElevatedButton(
+              child: CustomButton(
+                text: 'See All Sessions',
                 onPressed: () {
-                  // Navigate to all sessions
                   Navigator.push(context, MaterialPageRoute(builder: (context) => const SessionsScreen()));
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF00C4B3),
-                  foregroundColor: Colors.black87,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: const Text(
-                  'See All Sessions',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
+                }
+                )
             ),
           ),
         ],

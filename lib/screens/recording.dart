@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:ffmpeg_kit_flutter_new/ffmpeg_kit.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:stt/widget/custom_button.dart';
 import 'package:vibration/vibration.dart';
 import 'package:flutter_sound/flutter_sound.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -324,7 +325,7 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
       case RecordingStage.transcriptGenerated:
         return 'Transcript Generated';
       case RecordingStage.viewingSession:
-        return 'Session';
+        return '${widget.childName}';
     }
   }
 
@@ -349,9 +350,8 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
   Widget _buildInitialView() {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24.0),
+        padding: const EdgeInsets.only(top: 40.0, left: 24.0, right: 24.0, bottom: 24.0),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(Icons.mic, size: 80, color: Colors.grey[400]),
             const SizedBox(height: 24),
@@ -362,17 +362,7 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
             const SizedBox(height: 48),
             SizedBox(
               width: double.infinity,
-              child: ElevatedButton(
-                onPressed: startRecording,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFD0D0D0),
-                  foregroundColor: Colors.black87,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                child: const Text('Start Session', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
-              ),
+              child: CustomButton(text: 'Start Session', onPressed: startRecording,),
             ),
           ],
         ),
@@ -387,9 +377,8 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
 
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24.0),
+        padding: const EdgeInsets.only(top: 40.0, left: 24.0, right: 24.0, bottom: 24.0),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             // Timer
             StreamBuilder<int>(
@@ -400,7 +389,7 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
                 final displayTime = StopWatchTimer.getDisplayTime(value, hours: true, milliSecond: false);
                 return Text(
                   displayTime,
-                  style: const TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: Colors.black87),
+                  style: const TextStyle(fontSize: 64, color: Colors.black87),
                 );
               },
             ),
@@ -425,7 +414,6 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
 
             // Control buttons
             Row(
-              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 // Pause/Resume button
                 Container(
@@ -466,38 +454,28 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
   Widget _buildRecordingCompleteView() {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24.0),
+        // padding: const EdgeInsets.all(24.0),
+        padding: const EdgeInsets.only(top: 40.0, left: 24.0, right: 24.0, bottom: 24.0),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
               widget.childName,
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 12),
             Text(
               _formatDuration(_recordingDuration),
-              style: const TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: Colors.black87),
+              style: const TextStyle(fontSize: 64, color: Colors.black87),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             const Text(
-              'Recording Saved',
+              'Recording Complete',
               style: TextStyle(fontSize: 14, color: Colors.black54),
             ),
             const SizedBox(height: 48),
             SizedBox(
               width: double.infinity,
-              child: ElevatedButton(
-                onPressed: generateTranscript,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFD0D0D0),
-                  foregroundColor: Colors.black87,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                child: const Text('Generate Transcript', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
-              ),
+              child: CustomButton(text: 'Generate Transcript', onPressed: generateTranscript,),
             ),
           ],
         ),
@@ -509,9 +487,9 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
   Widget _buildGeneratingTranscriptView() {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24.0),
+        // padding: const EdgeInsets.all(24.0),
+        padding: const EdgeInsets.only(top: 40.0, left: 24.0, right: 24.0, bottom: 24.0),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
               widget.childName,
@@ -520,11 +498,14 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
             const SizedBox(height: 24),
             Text(
               _formatDuration(_recordingDuration),
-              style: const TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: Colors.black87),
+              style: const TextStyle(fontSize: 64, color: Colors.black87),
             ),
             const SizedBox(height: 48),
-            const CircularProgressIndicator(
+            const LinearProgressIndicator(
+              minHeight: 6,
+              borderRadius: BorderRadius.all(Radius.circular(8)),
               valueColor: AlwaysStoppedAnimation<Color>(Colors.black54),
+              backgroundColor: Color(0xFFE0E0E0),
             ),
             const SizedBox(height: 24),
             const Text(
@@ -543,7 +524,6 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
       child: Padding(
         padding: const EdgeInsets.all(24.0),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
               widget.childName,
@@ -552,7 +532,7 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
             const SizedBox(height: 24),
             Text(
               _formatDuration(_recordingDuration),
-              style: const TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: Colors.black87),
+              style: const TextStyle(fontSize: 64, color: Colors.black87),
             ),
             const SizedBox(height: 16),
             const Text(
@@ -562,21 +542,14 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
             const SizedBox(height: 48),
             SizedBox(
               width: double.infinity,
-              child: ElevatedButton(
+              child: CustomButton(
+                text: 'View Session',
                 onPressed: () {
                   saveSessionToFirestore();
                   setState(() {
                     _currentStage = RecordingStage.viewingSession;
                   });
                 },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFD0D0D0),
-                  foregroundColor: Colors.black87,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                child: const Text('View Micah\'s Session', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
               ),
             ),
           ],
@@ -593,28 +566,10 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Child Name Header
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE0E0E0),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.arrow_back_ios, size: 16),
-                  const SizedBox(width: 8),
-                  Text(
-                    widget.childName,
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-                  ),
-                ],
-              ),
-            ),
             const SizedBox(height: 20),
 
             // Display Name
-            const Text('Display Name', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w400)),
+            const Text('Child\'s Name', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w400)),
             const SizedBox(height: 8),
             Container(
               width: double.infinity,
@@ -644,7 +599,8 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
             // Listen to Recording Button
             SizedBox(
               width: double.infinity,
-              child: ElevatedButton(
+              child: CustomButton(
+                text: 'Listen to Recording',
                 onPressed: () async {
                   // Play audio
                   if (_recordedFilePath != null) {
@@ -657,14 +613,6 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
                     }
                   }
                 },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFD0D0D0),
-                  foregroundColor: Colors.black87,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                child: const Text('Listen to Recording', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
               ),
             ),
             const SizedBox(height: 20),

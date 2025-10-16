@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:stt/screens/children.dart';
+import 'package:stt/widget/custom_button.dart';
 
 class AddChildScreen extends StatefulWidget {
   const AddChildScreen({Key? key}) : super(key: key);
@@ -303,39 +304,7 @@ class _AddChildScreenState extends State<AddChildScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: _isSaving ? null : _saveChild,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF00C4B3),
-                      foregroundColor: Colors.black87,
-                      disabledBackgroundColor: const Color(0xFFE8E8E8),
-                      disabledForegroundColor: Colors.black38,
-                      elevation: 0,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: _isSaving
-                        ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.black54),
-                      ),
-                    )
-                        : const Text(
-                      'Save',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ),
+                CustomButton(text: 'Submit', onPressed: _saveChild, isLoading: _isSaving,),
               ],
             ),
           ),
