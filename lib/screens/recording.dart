@@ -1,6 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
-import 'package:ffmpeg_kit_flutter_new/ffmpeg_kit.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:stt/widget/custom_button.dart';
@@ -10,10 +10,9 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:stop_watch_timer/stop_watch_timer.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:flutter/services.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:google_speech/google_speech.dart';
+import 'package:http/http.dart' as http;
 
 class RecordingSessionScreen extends StatefulWidget {
   final String childId;
@@ -48,8 +47,10 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
   String? _recordedFilePath;
   String? _downloadURL;
   String? _transcriptText;
+  String? _sessionId;
   int _recordingDuration = 0;
   bool _isGeneratingTranscript = false;
+  bool _isSavingSession = false;
 
   @override
   void initState() {
@@ -70,10 +71,25 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
 
   @override
   void dispose() async {
+    await _cleanupTempFiles();
     await _stopWatchTimer.dispose();
     await _audioPlayer.closePlayer();
     await _recordingSession.closeRecorder();
     super.dispose();
+  }
+
+  Future<void> _cleanupTempFiles() async {
+    try {
+      if (_recordedFilePath != null) {
+        final file = File(_recordedFilePath!);
+        if (await file.exists()) {
+          await file.delete();
+          print('Cleaned up temp file: $_recordedFilePath');
+        }
+      }
+    } catch (e) {
+      print('Error cleaning up files: $e');
+    }
   }
 
   Future<void> _checkMicPermission() async {
@@ -84,13 +100,6 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
     }
     if (!status.isGranted) {
       throw Exception('Microphone permission not granted');
-    }
-  }
-
-  Future<void> openTheRecorder() async {
-    var status = await Permission.microphone.request();
-    if (status != PermissionStatus.granted) {
-      throw Exception('Microphone permission denied');
     }
   }
 
@@ -139,10 +148,9 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
       if (canVibrate == true) {
         Vibration.vibrate(duration: 100);
       }
-      setState(() {
-        _stopWatchTimer.onStopTimer();
-      });
+      _stopWatchTimer.onStopTimer();
       await WakelockPlus.disable();
+      setState(() {});
     } catch (e) {
       print('Error pausing recording: $e');
     }
@@ -155,10 +163,9 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
       if (canVibrate == true) {
         Vibration.vibrate(duration: 100);
       }
-      setState(() {
-        _stopWatchTimer.onStartTimer();
-      });
+      _stopWatchTimer.onStartTimer();
       await WakelockPlus.enable();
+      setState(() {});
     } catch (e) {
       print('Error resuming recording: $e');
     }
@@ -173,12 +180,14 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
       }
 
       _recordingDuration = _stopWatchTimer.rawTime.value;
-
       await WakelockPlus.disable();
 
       setState(() {
         _currentStage = RecordingStage.recordingComplete;
       });
+
+      // Save session immediately after stopping
+      await _saveSessionToFirestore();
     } catch (e) {
       print('Error stopping recording: $e');
       ScaffoldMessenger.of(context).showSnackBar(
@@ -187,73 +196,29 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
     }
   }
 
-  Future<void> generateTranscript() async {
+  Future<void> _saveSessionToFirestore() async {
+    if (_isSavingSession) return;
+
     setState(() {
-      _currentStage = RecordingStage.generatingTranscript;
-      _isGeneratingTranscript = true;
+      _isSavingSession = true;
     });
 
     try {
-      // Upload to Firebase Storage first
-      final storageRef = FirebaseStorage.instance.ref()
-          .child('recordings/${widget.childName}_${DateTime.now().millisecondsSinceEpoch}.wav');
-
-      final uploadTask = await storageRef.putFile(File(_recordedFilePath!));
-      _downloadURL = await uploadTask.ref.getDownloadURL();
-
-      final serviceAccount = ServiceAccount.fromString(
-          (await rootBundle.loadString('assets/cloud.json')));
-      final speechToText = SpeechToText.viaServiceAccount(serviceAccount);
-
-      final config = RecognitionConfig(
-        encoding: AudioEncoding.LINEAR16,
-        model: RecognitionModel.basic,
-        enableAutomaticPunctuation: true,
-        sampleRateHertz: 16000,
-        languageCode: 'en-US',
-      );
-
-      final inputPath = _recordedFilePath!;
-      final outputPath = inputPath.replaceAll('.aac', '.wav');
-
-      await FFmpegKit.execute(
-          '-y -i ${_recordedFilePath!} -ac 1 -ar 16000 -acodec pcm_s16le -af loudnorm ${_recordedFilePath!.replaceAll(".aac", ".wav")}'
-      );
-      _recordedFilePath = outputPath;
-      print('Converted to WAV: ${await File(outputPath).length()} bytes');
-
-      final audioBytes = File(_recordedFilePath!).readAsBytesSync().toList();
-      print('Audio data size (bytes): ${audioBytes.length}');
-      final response = await speechToText.recognize(config, audioBytes);
-      print('response: $response');
-
-      _transcriptText = response.results
-          .map((e) => e.alternatives.first.transcript)
-          .join('\n');
-      print('transcriptText: $_transcriptText');
-
-      setState(() {
-        _currentStage = RecordingStage.transcriptGenerated;
-        _isGeneratingTranscript = false;
-      });
-    } catch (e) {
-      setState(() {
-        _isGeneratingTranscript = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-      );
-    }
-  }
-
-  Future<void> saveSessionToFirestore() async {
-    try {
       final user = FirebaseAuth.instance.currentUser;
-
       if (user == null) {
-        throw Exception('No user logged in');
+        throw Exception('Please login first');
       }
 
+      // Upload audio to Firebase Storage
+      final storageRef = FirebaseStorage.instance.ref()
+          .child('recordings/${widget.childId}_${DateTime.now().millisecondsSinceEpoch}.$_fileExtension');
+
+      print('Uploading file to Storage...');
+      final uploadTask = await storageRef.putFile(File(_recordedFilePath!));
+      _downloadURL = await uploadTask.ref.getDownloadURL();
+      print('File uploaded: $_downloadURL');
+
+      // Create session document
       final docRef = FirebaseFirestore.instance.collection('sessions').doc();
       await docRef.set({
         'id': docRef.id,
@@ -263,19 +228,150 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
         'track': widget.track,
         'notes': widget.notes,
         'audioUrl': _downloadURL,
-        'duration': _recordingDuration,
-        'transcript': _transcriptText ?? '',
+        'duration': _recordingDuration ~/ 1000, // Convert to seconds
+        'transcript': '', // Will be updated by Cloud Function
         'createdBy': user.uid,
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Session saved successfully!'), backgroundColor: Colors.green),
-      );
+      _sessionId = docRef.id;
+      print('Session saved with ID: $_sessionId');
+
+      setState(() {
+        _isSavingSession = false;
+      });
+
+      // if (mounted) {
+      //   ScaffoldMessenger.of(context).showSnackBar(
+      //     const SnackBar(
+      //       content: Text('Session saved successfully!'),
+      //       backgroundColor: Colors.green,
+      //     ),
+      //   );
+      // }
     } catch (e) {
+      print('Error saving session: $e');
+      setState(() {
+        _isSavingSession = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving session: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> generateTranscript() async {
+    if (_sessionId == null || _downloadURL == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error saving session: $e'), backgroundColor: Colors.red),
+        const SnackBar(
+          content: Text('Please start your session again'),
+          backgroundColor: Colors.red,
+        ),
       );
+      return;
+    }
+
+    setState(() {
+      _currentStage = RecordingStage.generatingTranscript;
+      _isGeneratingTranscript = true;
+    });
+
+    try {
+      print('Calling Cloud Function...');
+      const functionUrl = String.fromEnvironment('FUNCTION_URL');
+      print('functionUrl: $functionUrl');
+
+      if (functionUrl.isEmpty) {
+        print('Error: FUNCTION_URL not configured');
+        setState(() {
+          _currentStage = RecordingStage.recordingComplete;
+          _isGeneratingTranscript = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error generating transcript'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      final user = FirebaseAuth.instance.currentUser;
+      final idToken = await user?.getIdToken();
+
+      final response = await http.post(
+        Uri.parse(functionUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $idToken',
+        },
+        body: jsonEncode({
+          'audioUrl': _downloadURL,
+          'childId': widget.childId,
+          'sessionId': _sessionId,
+        }),
+      );
+
+      print('Function response: ${response}');
+      final result = jsonDecode(response.body);
+      print('Function result: ${result}');
+
+      // Check if success is true
+      if (result['success'] != true) {
+        setState(() {
+          _currentStage = RecordingStage.recordingComplete;
+          _isGeneratingTranscript = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error generating transcript'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      // Extract transcript from result
+      final transcript = result['transcript'] ?? '';
+      print('transcript: $transcript');
+
+      setState(() {
+        _transcriptText = transcript;
+        _currentStage = RecordingStage.transcriptGenerated;
+        _isGeneratingTranscript = false;
+      });
+
+      // if (mounted) {
+      //   ScaffoldMessenger.of(context).showSnackBar(
+      //     const SnackBar(
+      //       content: Text('Transcript generated successfully!'),
+      //       backgroundColor: Colors.green,
+      //     ),
+      //   );
+      // }
+    } catch (e) {
+      print('Error generating transcript: $e');
+
+      setState(() {
+        _isGeneratingTranscript = false;
+        _currentStage = RecordingStage.recordingComplete;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
     }
   }
 
@@ -373,14 +469,12 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
   // Stage 2: Recording View
   Widget _buildRecordingView() {
     final isRecording = _recordingSession.isRecording;
-    final isPaused = _recordingSession.isPaused;
 
     return Center(
       child: Padding(
         padding: const EdgeInsets.only(top: 40.0, left: 24.0, right: 24.0, bottom: 24.0),
         child: Column(
           children: [
-            // Timer
             StreamBuilder<int>(
               stream: _stopWatchTimer.rawTime,
               initialData: _stopWatchTimer.rawTime.value,
@@ -396,7 +490,7 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
 
             const SizedBox(height: 48),
 
-            // Waveform placeholder
+            // Waveform
             Container(
               height: 150,
               width: double.infinity,
@@ -454,7 +548,6 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
   Widget _buildRecordingCompleteView() {
     return Center(
       child: Padding(
-        // padding: const EdgeInsets.all(24.0),
         padding: const EdgeInsets.only(top: 40.0, left: 24.0, right: 24.0, bottom: 24.0),
         child: Column(
           children: [
@@ -468,14 +561,14 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
               style: const TextStyle(fontSize: 64, color: Colors.black87),
             ),
             const SizedBox(height: 12),
-            const Text(
-              'Recording Complete',
-              style: TextStyle(fontSize: 14, color: Colors.black54),
+            Text(
+              _isSavingSession ? 'Saving session...' : 'Recording Complete',
+              style: const TextStyle(fontSize: 14, color: Colors.black54),
             ),
             const SizedBox(height: 48),
             SizedBox(
               width: double.infinity,
-              child: CustomButton(text: 'Generate Transcript', onPressed: generateTranscript,),
+              child: CustomButton(text: 'Generate Transcript', onPressed: _isSavingSession ? null : generateTranscript, isLoading: _isSavingSession,),
             ),
           ],
         ),
@@ -487,7 +580,6 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
   Widget _buildGeneratingTranscriptView() {
     return Center(
       child: Padding(
-        // padding: const EdgeInsets.all(24.0),
         padding: const EdgeInsets.only(top: 40.0, left: 24.0, right: 24.0, bottom: 24.0),
         child: Column(
           children: [
@@ -545,7 +637,6 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
               child: CustomButton(
                 text: 'View Session',
                 onPressed: () {
-                  saveSessionToFirestore();
                   setState(() {
                     _currentStage = RecordingStage.viewingSession;
                   });
@@ -568,7 +659,6 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
           children: [
             const SizedBox(height: 20),
 
-            // Display Name
             const Text('Child\'s Name', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w400)),
             const SizedBox(height: 8),
             Container(
@@ -582,7 +672,6 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
             ),
             const SizedBox(height: 20),
 
-            // Parent's Name
             const Text("Parent's Name", style: TextStyle(fontSize: 14, fontWeight: FontWeight.w400)),
             const SizedBox(height: 8),
             Container(
@@ -602,10 +691,9 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
               child: CustomButton(
                 text: 'Listen to Recording',
                 onPressed: () async {
-                  // Play audio
-                  if (_recordedFilePath != null) {
+                  if (_downloadURL != null) {
                     try {
-                      await _audioPlayer.startPlayer(fromURI: _recordedFilePath!);
+                      await _audioPlayer.startPlayer(fromURI: _downloadURL!);
                     } catch (e) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(content: Text('Error playing audio: $e'), backgroundColor: Colors.red),
@@ -617,7 +705,6 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
             ),
             const SizedBox(height: 20),
 
-            // Notes
             const Text('Notes', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w400)),
             const SizedBox(height: 8),
             Container(
@@ -631,7 +718,6 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
             ),
             const SizedBox(height: 20),
 
-            // Transcript
             const Text('Transcript', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w400)),
             const SizedBox(height: 8),
             Container(
@@ -646,7 +732,6 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
             ),
             const SizedBox(height: 20),
 
-            // Summary
             const Text('Summary', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w400)),
             const SizedBox(height: 8),
             Container(
