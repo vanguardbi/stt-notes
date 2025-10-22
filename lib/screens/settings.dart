@@ -241,7 +241,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             children: [
                               Icon(
                                 Icons.logout,
-                                color: Colors.white,
+                                color: Colors.black87,
                                 size: 18,
                               ),
                               SizedBox(width: 8),
@@ -250,7 +250,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 style: TextStyle(
                                   fontFamily: 'Inter',
                                   fontWeight: FontWeight.w600,
-                                  color: Colors.white,
+                                  color: Colors.black87,
                                   fontSize: 16,
                                 ),
                               ),

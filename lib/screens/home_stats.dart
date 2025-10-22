@@ -143,7 +143,7 @@ class HomeStats extends StatelessWidget {
                   itemCount: snapshot.data!.docs.length,
                   itemBuilder: (context, index) {
                     var sessionData = snapshot.data!.docs[index].data() as Map<String, dynamic>;
-                    String childName = sessionData['childName'] ?? 'Unknown Child';
+                    String childName = sessionData['childName'] ?? '';
                     Timestamp? timestamp = sessionData['createdAt'];
                     String dateStr = '';
 
@@ -167,10 +167,13 @@ class HomeStats extends StatelessWidget {
                           leading: CircleAvatar(
                             radius: 20,
                             backgroundColor: const Color(0xFFE0E0E0),
-                            child: const Icon(
-                              Icons.mic,
-                              color: Colors.black87,
-                              size: 20,
+                            child: Text(
+                              childName.isNotEmpty ? childName[0].toUpperCase() : 'C',
+                              style: const TextStyle(
+                                color: Colors.black87,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           ),
                           title: Text(

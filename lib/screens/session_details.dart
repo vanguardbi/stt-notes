@@ -317,7 +317,7 @@ class _SessionDetailsScreenState extends State<SessionDetailsScreen> {
                 child: ElevatedButton(
                   onPressed: _playAudio,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _isPlaying ? const Color(0xFFFF5959) : const Color(0xFFD0D0D0),
+                    backgroundColor: _isPlaying ? const Color(0xFFFF5959) : const Color(0xFF00C4B3),
                     foregroundColor: Colors.black87,
                     elevation: 0,
                     padding: const EdgeInsets.symmetric(vertical: 16),

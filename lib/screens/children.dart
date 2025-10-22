@@ -179,7 +179,7 @@ class _ChildrenListScreenState extends State<ChildrenListScreen> {
                   itemCount: filteredDocs.length,
                   itemBuilder: (context, index) {
                     var childData = filteredDocs[index].data() as Map<String, dynamic>;
-                    String childName = childData['childName'] ?? 'Unknown';
+                    String childName = childData['childName'] ?? '';
                     Timestamp? timestamp = childData['createdAt'];
                     String dateStr = '';
 
