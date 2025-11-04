@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_sound/flutter_sound.dart';
+import 'package:stt/widget/custom_appbar.dart';
 
 class SessionDetailsScreen extends StatefulWidget {
   final String sessionId;
@@ -158,22 +159,7 @@ class _SessionDetailsScreenState extends State<SessionDetailsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
-      appBar: AppBar(
-        backgroundColor: const Color(0xFFFF5959),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Session Details',
-          style: TextStyle(
-            color: Colors.black,
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ),
+      appBar: CustomAppBar(title: 'Session Details', showBack: true,),
       body: _isLoading
           ? const Center(
         child: CircularProgressIndicator(
@@ -362,9 +348,9 @@ class _SessionDetailsScreenState extends State<SessionDetailsScreen> {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  _sessionData!['transcript']?.isEmpty ?? true
+                  _sessionData!['formattedConversation']?.isEmpty ?? true
                       ? 'No transcript available'
-                      : _sessionData!['transcript'],
+                      : _sessionData!['formattedConversation'],
                   style: const TextStyle(fontSize: 14),
                 ),
               ),
@@ -381,8 +367,10 @@ class _SessionDetailsScreenState extends State<SessionDetailsScreen> {
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Text(
-                  'AI-generated summary will appear here',
+                child: Text(
+                    _sessionData!['summary']?.isEmpty ?? true
+                        ? 'AI-generated summary will appear here'
+                        : _sessionData!['summary'],
                   style: TextStyle(fontSize: 14, color: Colors.grey),
                 ),
               ),

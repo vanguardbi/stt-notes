@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:stt/screens/session_details.dart';
+import 'package:stt/widget/custom_appbar.dart';
 
 class SessionsScreen extends StatefulWidget {
   const SessionsScreen({Key? key}) : super(key: key);
@@ -71,22 +72,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
-      appBar: AppBar(
-        backgroundColor: const Color(0xFFFF5959),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Sessions',
-          style: TextStyle(
-            color: Colors.black,
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ),
+      appBar: CustomAppBar(title: 'Sessions', showBack: true,),
       body: Column(
         children: [
           // Dropdown Filter
@@ -233,7 +219,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
                           ),
                           leading: CircleAvatar(
                             radius: 20,
-                            backgroundColor: const Color(0xFFE0E0E0),
+                            backgroundColor: const Color(0xFF00C4B3),
                             child: const Icon(
                               Icons.mic,
                               color: Colors.black87,

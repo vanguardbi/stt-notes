@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:stt/screens/recording.dart';
+import 'package:stt/widget/custom_appbar.dart';
 import 'package:stt/widget/custom_button.dart';
 
 class AddSessionScreen extends StatefulWidget {
@@ -21,13 +22,13 @@ class _AddSessionScreenState extends State<AddSessionScreen> {
   List<Map<String, dynamic>> _children = [];
   bool _isLoadingChildren = true;
   bool _isSaving = false;
-
-  final List<String> _tracks = ['Late Talking', 'Stuttering'];
+  List<String> _tracks = [];
 
   @override
   void initState() {
     super.initState();
     _loadChildren();
+    _loadTracks();
   }
 
   Future<void> _loadChildren() async {
@@ -39,9 +40,11 @@ class _AddSessionScreenState extends State<AddSessionScreen> {
 
       setState(() {
         _children = snapshot.docs.map((doc) {
+          final data = doc.data() as Map<String, dynamic>? ?? {};
           return {
             'id': doc.id,
-            'name': doc.data() != null ? (doc.data() as Map<String, dynamic>)['childName'] ?? 'Unknown' : 'Unknown',
+            'name': data['childName'] ?? '',
+            'parentName': data['parentName'] ?? '',
           };
         }).toList();
         _isLoadingChildren = false;
@@ -58,6 +61,25 @@ class _AddSessionScreenState extends State<AddSessionScreen> {
           ),
         );
       }
+    }
+  }
+
+  Future<void> _loadTracks() async {
+    try {
+      QuerySnapshot snapshot = await FirebaseFirestore.instance
+          .collection('tracks')
+          .get();
+
+      setState(() {
+        _tracks = snapshot.docs.map((doc) {
+          final data = doc.data() as Map<String, dynamic>?;
+          return data?['name'] ?? 'Unknown';
+        }).cast<String>().toList();
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error loading tracks: $e'), backgroundColor: Colors.red),
+      );
     }
   }
 
@@ -90,34 +112,7 @@ class _AddSessionScreenState extends State<AddSessionScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
-      appBar: AppBar(
-        backgroundColor: const Color(0xFFFF5959),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.black, size: 20),
-          onPressed: () {
-            if (Navigator.canPop(context)) {
-              Navigator.pop(context);
-            } else {
-              Navigator.pushReplacementNamed(context, '/home');
-            }
-          },
-        ),
-        title: const Text(
-          'New Session',
-          style: TextStyle(
-            color: Colors.black,
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.menu, color: Colors.black),
-            onPressed: () {},
-          ),
-        ],
-      ),
+      appBar: CustomAppBar(title: 'New Session', showBack: true,),
       body: Form(
         key: _formKey,
         child: SingleChildScrollView(
@@ -194,9 +189,9 @@ class _AddSessionScreenState extends State<AddSessionScreen> {
                     onChanged: (value) {
                       setState(() {
                         _selectedChildId = value;
-                        _selectedChildName = _children.firstWhere(
-                              (child) => child['id'] == value,
-                        )['name'];
+                        final selectedChild = _children.firstWhere((child) => child['id'] == value);
+                        _selectedChildName = selectedChild['name'];
+                        _parentNameController.text = selectedChild['parentName'] ?? '';
                       });
                     },
                   ),
@@ -220,6 +215,7 @@ class _AddSessionScreenState extends State<AddSessionScreen> {
                   ),
                   child: TextFormField(
                     controller: _parentNameController,
+                    readOnly: true,
                     style: const TextStyle(
                       fontSize: 14,
                     ),
