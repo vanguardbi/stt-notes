@@ -222,7 +222,7 @@ class _MainPageState extends State<MainPage> {
           // elevation: 16,
           shadowColor: Colors.black.withOpacity(0.3),
           borderRadius: BorderRadius.circular(20),
-          color: const Color(0xFFD0D0D0),
+          color: const Color(0xFFFF5959),
           child: SizedBox(
             height: 70,
             width: double.infinity,
@@ -255,8 +255,8 @@ class _MainPageState extends State<MainPage> {
                       data[i],
                       size: 35,
                       color: i == selectedIndex
-                          ? Theme.of(context).colorScheme.onErrorContainer
-                          : Theme.of(context).colorScheme.inversePrimary,
+                          ? Colors.white
+                          : Colors.white.withOpacity(0.7),
                     ),
                   ),
                 ),

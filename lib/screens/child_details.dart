@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:stt/screens/session_details.dart';
 import 'package:stt/screens/sessions.dart';
+import 'package:stt/widget/custom_appbar.dart';
+import 'package:stt/widget/custom_button.dart';
 
 class ChildDetailsScreen extends StatefulWidget {
   final String childId;
@@ -25,34 +27,7 @@ class _ChildDetailsScreenState extends State<ChildDetailsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
-      appBar: AppBar(
-        backgroundColor: const Color(0xFFFF5959),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.black, size: 20),
-          onPressed: () {
-            if (Navigator.canPop(context)) {
-              Navigator.pop(context);
-            } else {
-              Navigator.pushReplacementNamed(context, '/home');
-            }
-          },
-        ),
-        title: Text(
-          widget.childName,
-          style: const TextStyle(
-            color: Colors.black,
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.menu, color: Colors.black),
-            onPressed: () {},
-          ),
-        ],
-      ),
+      appBar: CustomAppBar(title: '${widget.childName}', showBack: true,),
       body: Column(
         children: [
           // Track Dropdown Section
@@ -203,7 +178,7 @@ class _ChildDetailsScreenState extends State<ChildDetailsScreen> {
                           ),
                           leading: CircleAvatar(
                             radius: 20,
-                            backgroundColor: const Color(0xFFE0E0E0),
+                            backgroundColor: const Color(0xFF00C4B3),
                             child: Text(
                               track.isNotEmpty ? track[0].toUpperCase() : 'S',
                               style: const TextStyle(
@@ -242,31 +217,15 @@ class _ChildDetailsScreenState extends State<ChildDetailsScreen> {
             ),
           ),
 
-          // Save All Sessions Button
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: SizedBox(
               width: double.infinity,
-              child: ElevatedButton(
+              child: CustomButton(
+                text: 'See All Sessions',
                 onPressed: () {
                   Navigator.push(context, MaterialPageRoute(builder: (context) => const SessionsScreen()));
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF00C4B3),
-                  foregroundColor: Colors.black87,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: const Text(
-                  'See All Sessions',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
+                }
               ),
             ),
           ),

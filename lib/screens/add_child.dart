@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:stt/screens/children.dart';
+import 'package:stt/widget/custom_appbar.dart';
 import 'package:stt/widget/custom_button.dart';
 
 class AddChildScreen extends StatefulWidget {
@@ -18,9 +19,15 @@ class _AddChildScreenState extends State<AddChildScreen> {
   final TextEditingController _notesController = TextEditingController();
 
   final List<String> _selectedTracks = [];
-  final List<String> _availableTracks = ['Late Talking', 'Stuttering'];
+  List<String> _availableTracks = [];
 
   bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTracks();
+  }
 
   @override
   void dispose() {
@@ -38,6 +45,25 @@ class _AddChildScreenState extends State<AddChildScreen> {
         _selectedTracks.add(track);
       }
     });
+  }
+
+  Future<void> _loadTracks() async {
+    try {
+      QuerySnapshot snapshot = await FirebaseFirestore.instance
+          .collection('tracks')
+          .get();
+
+      setState(() {
+        _availableTracks = snapshot.docs.map((doc) {
+          final data = doc.data() as Map<String, dynamic>?;
+          return data?['name'] ?? 'Unknown';
+        }).cast<String>().toList();
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error loading tracks: $e'), backgroundColor: Colors.red),
+      );
+    }
   }
 
   Future<void> _saveChild() async {
@@ -106,34 +132,7 @@ class _AddChildScreenState extends State<AddChildScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
-      appBar: AppBar(
-        backgroundColor: const Color(0xFFFF5959),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.black, size: 20),
-          onPressed: () {
-            if (Navigator.canPop(context)) {
-              Navigator.pop(context);
-            } else {
-              Navigator.pushReplacementNamed(context, '/home');
-            }
-          },
-        ),
-        title: const Text(
-          'New Child',
-          style: TextStyle(
-            color: Colors.black,
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.menu, color: Colors.black),
-            onPressed: () {},
-          ),
-        ],
-      ),
+      appBar: CustomAppBar(title: 'New Child', showBack: true,),
       body: Form(
         key: _formKey,
         child: SingleChildScrollView(

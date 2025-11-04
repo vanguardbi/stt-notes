@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:stt/widget/custom_appbar.dart';
 import 'package:stt/widget/custom_button.dart';
 import 'package:vibration/vibration.dart';
 import 'package:flutter_sound/flutter_sound.dart';
@@ -47,6 +48,7 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
   String? _recordedFilePath;
   String? _downloadURL;
   String? _transcriptText;
+  String? _aiSummary;
   String? _sessionId;
   int _recordingDuration = 0;
   bool _isGeneratingTranscript = false;
@@ -285,7 +287,6 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
     try {
       print('Calling Cloud Function...');
       const functionUrl = String.fromEnvironment('FUNCTION_URL');
-      print('functionUrl: $functionUrl');
 
       if (functionUrl.isEmpty) {
         print('Error: FUNCTION_URL not configured');
@@ -339,10 +340,13 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
 
       // Extract transcript from result
       final transcript = result['transcript'] ?? '';
+      final transcriptConvo = result['formattedConversation'] ?? '';
+      final aiSummary = result['summary'] ?? '';
       print('transcript: $transcript');
 
       setState(() {
-        _transcriptText = transcript;
+        _transcriptText = transcriptConvo;
+        _aiSummary = aiSummary;
         _currentStage = RecordingStage.transcriptGenerated;
         _isGeneratingTranscript = false;
       });
@@ -382,29 +386,8 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFFFF5959),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.black, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          _getAppBarTitle(),
-          style: const TextStyle(
-            color: Colors.black,
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.menu, color: Colors.black),
-            onPressed: () {},
-          ),
-        ],
-      ),
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      appBar: CustomAppBar(title: _getAppBarTitle(), showBack: true,),
       body: _buildBody(),
     );
   }
@@ -742,7 +725,7 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Text('AI-generated summary will appear here', style: TextStyle(fontSize: 14)),
+              child: Text(_aiSummary ?? 'AI-generated summary will appear here', style: TextStyle(fontSize: 14)),
             ),
           ],
         ),

@@ -3,6 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:stt/screens/add_child.dart';
 import 'package:stt/screens/child_details.dart';
 import 'package:stt/screens/sessions.dart';
+import 'package:stt/widget/custom_appbar.dart';
+import 'package:stt/widget/custom_button.dart';
 
 class ChildrenListScreen extends StatefulWidget {
   const ChildrenListScreen({Key? key}) : super(key: key);
@@ -18,37 +20,18 @@ class _ChildrenListScreenState extends State<ChildrenListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
-      appBar: AppBar(
-        backgroundColor: const Color(0xFFFF5959),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.black, size: 20),
-          onPressed: () {
-            if (Navigator.canPop(context)) {
-              Navigator.pop(context);
-            } else {
-              Navigator.pushReplacementNamed(context, '/home');
-            }
-          },
-        ),
-        title: const Text(
-          'Children',
-          style: TextStyle(
-            color: Colors.black,
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
+      appBar: CustomAppBar(
+        title: 'Children',
+        showBack: true,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const AddChildScreen()),
-            ),
-          )
-        ],
-      ),
+        IconButton(
+          icon: const Icon(Icons.add, color: Colors.white, size: 20),
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const AddChildScreen()),
+          ),
+        )
+      ],),
       body: Column(
         children: [
           // Search Bar
@@ -202,7 +185,7 @@ class _ChildrenListScreenState extends State<ChildrenListScreen> {
                           ),
                           leading: CircleAvatar(
                             radius: 20,
-                            backgroundColor: const Color(0xFFE0E0E0),
+                            backgroundColor: const Color(0xFF00C4B3),
                             child: Text(
                               childName.isNotEmpty ? childName[0].toUpperCase() : 'C',
                               style: const TextStyle(
@@ -253,26 +236,11 @@ class _ChildrenListScreenState extends State<ChildrenListScreen> {
             padding: const EdgeInsets.all(16.0),
             child: SizedBox(
               width: double.infinity,
-              child: ElevatedButton(
+              child: CustomButton(
+                text: 'See All Sessions',
                 onPressed: () {
                   Navigator.push(context, MaterialPageRoute(builder: (context) => const SessionsScreen()));
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF00C4B3),
-                  foregroundColor: Colors.black87,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: const Text(
-                  'See All Sessions',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
+                }
               ),
             ),
           ),

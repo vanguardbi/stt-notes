@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:stt/screens/add_session.dart';
 import 'package:stt/screens/session_details.dart';
 import 'package:stt/screens/sessions.dart';
+import 'package:stt/widget/custom_appbar.dart';
 import 'package:stt/widget/custom_button.dart';
 
 class HomeStats extends StatelessWidget {
@@ -32,24 +33,7 @@ class HomeStats extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
-      appBar: AppBar(
-        backgroundColor: const Color(0xFFFF5959),
-        elevation: 0,
-        title: Text(
-          '${_getGreeting()}, ${_getUserName()}',
-          style: TextStyle(
-            color: Colors.black,
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.menu, color: Colors.black),
-            onPressed: () {},
-          ),
-        ],
-      ),
+      appBar: CustomAppBar(title: '${_getGreeting()}, ${_getUserName()}'),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -166,7 +150,7 @@ class HomeStats extends StatelessWidget {
                           ),
                           leading: CircleAvatar(
                             radius: 20,
-                            backgroundColor: const Color(0xFFE0E0E0),
+                            backgroundColor: const Color(0xFF00C4B3),
                             child: Text(
                               childName.isNotEmpty ? childName[0].toUpperCase() : 'C',
                               style: const TextStyle(
