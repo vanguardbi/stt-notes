@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:stt/widget/custom_appbar.dart';
 import 'package:stt/widget/custom_button.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:vibration/vibration.dart';
 import 'package:flutter_sound/flutter_sound.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -48,6 +49,7 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
   String? _recordedFilePath;
   String? _downloadURL;
   String? _transcriptText;
+  String? _docUrl;
   String? _aiSummary;
   String? _sessionId;
   int _recordingDuration = 0;
@@ -316,10 +318,15 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
           'audioUrl': _downloadURL,
           'childId': widget.childId,
           'sessionId': _sessionId,
+          'name': widget.childName,
+          'track': widget.track,
+          'objectives': widget.notes,
         }),
       );
 
       print('Function response: ${response}');
+      print('Function response status: ${response.statusCode}');
+      print('Function response body: ${response.body}');
       final result = jsonDecode(response.body);
       print('Function result: ${result}');
 
@@ -342,10 +349,13 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
       final transcript = result['transcript'] ?? '';
       final transcriptConvo = result['formattedConversation'] ?? '';
       final aiSummary = result['summary'] ?? '';
+      final docUrl = result['url'] ?? '';
       print('transcript: $transcript');
+      print('transcriptConvo: $transcriptConvo');
 
       setState(() {
         _transcriptText = transcriptConvo;
+        _docUrl = docUrl;
         _aiSummary = aiSummary;
         _currentStage = RecordingStage.transcriptGenerated;
         _isGeneratingTranscript = false;
@@ -376,6 +386,35 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
           ),
         );
       }
+    }
+  }
+
+  Future<void> _openTranscriptUrl() async {
+    if (_docUrl == null || _docUrl!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Transcript URL not available'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    try {
+      final Uri url = Uri.parse(_docUrl!);
+      if (await canLaunchUrl(url)) {
+        await launchUrl(url, mode: LaunchMode.externalApplication);
+      } else {
+        throw Exception('Could not launch URL');
+      }
+    } catch (e) {
+      print('Error opening transcript URL: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error opening transcript: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -688,7 +727,7 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
             ),
             const SizedBox(height: 20),
 
-            const Text('Notes', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w400)),
+            const Text('Objectives', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w400)),
             const SizedBox(height: 8),
             Container(
               width: double.infinity,
@@ -697,7 +736,7 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Text(widget.notes.isEmpty ? 'No notes' : widget.notes, style: const TextStyle(fontSize: 14)),
+              child: Text(widget.notes.isEmpty ? 'No objectives' : widget.notes, style: const TextStyle(fontSize: 14)),
             ),
             const SizedBox(height: 20),
 
@@ -715,18 +754,31 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
             ),
             const SizedBox(height: 20),
 
+            // const Text('Summary', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w400)),
+            // const SizedBox(height: 8),
+            // Container(
+            //   width: double.infinity,
+            //   padding: const EdgeInsets.all(16),
+            //   constraints: const BoxConstraints(minHeight: 100),
+            //   decoration: BoxDecoration(
+            //     color: Colors.white,
+            //     borderRadius: BorderRadius.circular(8),
+            //   ),
+            //   child: Text(_aiSummary ?? 'AI-generated summary will appear here', style: TextStyle(fontSize: 14)),
+            // ),
+
             const Text('Summary', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w400)),
             const SizedBox(height: 8),
-            Container(
+            SizedBox(
               width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              constraints: const BoxConstraints(minHeight: 100),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
+              child: CustomButton(
+                text: 'View Summary in Google Docs',
+                onPressed: _docUrl != null && _docUrl!.isNotEmpty
+                    ? _openTranscriptUrl
+                    : null,
               ),
-              child: Text(_aiSummary ?? 'AI-generated summary will appear here', style: TextStyle(fontSize: 14)),
             ),
+            const SizedBox(height: 20),
           ],
         ),
       ),

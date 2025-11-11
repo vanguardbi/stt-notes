@@ -314,7 +314,7 @@ class _AddSessionScreenState extends State<AddSessionScreen> {
 
                 // Notes
                 const Text(
-                  'Notes',
+                  'Objectives (Separate with commas)',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w400,

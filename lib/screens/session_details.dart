@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_sound/flutter_sound.dart';
 import 'package:stt/widget/custom_appbar.dart';
+import 'package:stt/widget/custom_button.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class SessionDetailsScreen extends StatefulWidget {
   final String sessionId;
@@ -130,6 +132,35 @@ class _SessionDetailsScreenState extends State<SessionDetailsScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error playing audio: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _openTranscriptUrl() async {
+    if (_sessionData!['url'] == null || _sessionData!['url']!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Transcript URL not available'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    try {
+      final Uri url = Uri.parse(_sessionData!['url']!);
+      if (await canLaunchUrl(url)) {
+        await launchUrl(url, mode: LaunchMode.externalApplication);
+      } else {
+        throw Exception('Could not launch URL');
+      }
+    } catch (e) {
+      print('Error opening transcript URL: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error opening transcript: $e'),
           backgroundColor: Colors.red,
         ),
       );
@@ -304,7 +335,7 @@ class _SessionDetailsScreenState extends State<SessionDetailsScreen> {
                   onPressed: _playAudio,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _isPlaying ? const Color(0xFFFF5959) : const Color(0xFF00C4B3),
-                    foregroundColor: Colors.black87,
+                    foregroundColor: Colors.white,
                     elevation: 0,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -318,7 +349,7 @@ class _SessionDetailsScreenState extends State<SessionDetailsScreen> {
               const SizedBox(height: 20),
 
               // Notes
-              const Text('Notes', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w400)),
+              const Text('Objectives', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w400)),
               const SizedBox(height: 8),
               Container(
                 width: double.infinity,
@@ -329,7 +360,7 @@ class _SessionDetailsScreenState extends State<SessionDetailsScreen> {
                 ),
                 child: Text(
                   _sessionData!['notes']?.isEmpty ?? true
-                      ? 'No notes'
+                      ? 'No objectives'
                       : _sessionData!['notes'],
                   style: const TextStyle(fontSize: 14),
                 ),
@@ -357,23 +388,36 @@ class _SessionDetailsScreenState extends State<SessionDetailsScreen> {
               const SizedBox(height: 20),
 
               // Summary (Placeholder for future AI summary)
+              // const Text('Summary', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w400)),
+              // const SizedBox(height: 8),
+              // Container(
+              //   width: double.infinity,
+              //   padding: const EdgeInsets.all(16),
+              //   constraints: const BoxConstraints(minHeight: 100),
+              //   decoration: BoxDecoration(
+              //     color: Colors.white,
+              //     borderRadius: BorderRadius.circular(8),
+              //   ),
+              //   child: Text(
+              //       _sessionData!['summary']?.isEmpty ?? true
+              //           ? 'AI-generated summary will appear here'
+              //           : _sessionData!['summary'],
+              //     style: TextStyle(fontSize: 14, color: Colors.grey),
+              //   ),
+              // ),
+
               const Text('Summary', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w400)),
               const SizedBox(height: 8),
-              Container(
+              SizedBox(
                 width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                constraints: const BoxConstraints(minHeight: 100),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                    _sessionData!['summary']?.isEmpty ?? true
-                        ? 'AI-generated summary will appear here'
-                        : _sessionData!['summary'],
-                  style: TextStyle(fontSize: 14, color: Colors.grey),
+                child: CustomButton(
+                  text: 'View Summary in Google Docs',
+                  onPressed: _sessionData!['url'] != null && _sessionData!['url']!.isNotEmpty
+                      ? _openTranscriptUrl
+                      : null,
                 ),
               ),
+              const SizedBox(height: 20),
             ],
           ),
         ),

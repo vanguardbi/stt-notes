@@ -21,7 +21,32 @@ class ChildDetailsScreen extends StatefulWidget {
 
 class _ChildDetailsScreenState extends State<ChildDetailsScreen> {
   String selectedTrack = 'All Tracks';
-  final List<String> tracks = ['Late Talking', 'Stuttering'];
+  List<String> tracks = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTracks();
+  }
+
+  Future<void> _loadTracks() async {
+    try {
+      QuerySnapshot snapshot = await FirebaseFirestore.instance
+          .collection('tracks')
+          .get();
+
+      setState(() {
+        tracks = snapshot.docs.map((doc) {
+          final data = doc.data() as Map<String, dynamic>?;
+          return data?['name'] ?? 'Unknown';
+        }).cast<String>().toList();
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error loading tracks: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
