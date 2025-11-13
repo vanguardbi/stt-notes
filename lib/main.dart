@@ -1,24 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:iconsax/iconsax.dart';
-import 'package:stt/screens/add_child.dart';
 import 'package:stt/screens/add_session.dart';
 import 'package:stt/screens/children.dart';
 import 'package:stt/screens/home_stats.dart';
-import 'package:stt/screens/notes_page.dart';
-import 'package:stt/screens/recording.dart';
 import 'package:stt/screens/settings.dart';
-import 'package:stt/screens/test_rec.dart';
-import 'package:stt/screens/voice.dart';
-import 'package:stt/screens/transcribe_page.dart';
-import 'package:stt/screens/voice_recorder_page.dart';
 import 'package:flutter/services.dart';
-import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:stt/theme/color_scheme.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:stt/widget/auth_wrapper.dart';
 import 'firebase_options.dart';
-import 'package:flutter_native_splash/flutter_native_splash.dart';
 
 Future<void> main() async {
   final WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
