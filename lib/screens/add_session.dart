@@ -1,3 +1,4 @@
+import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:stt/screens/recording.dart';
@@ -147,52 +148,87 @@ class _AddSessionScreenState extends State<AddSessionScreen> {
                       ),
                     ),
                   )
-                      : DropdownButtonFormField<String>(
-                    value: _selectedChildId,
-                    hint: Text(
-                      'Select a child',
-                      style: TextStyle(
-                        color: Colors.grey[400],
-                        fontSize: 14,
+                      : DropdownSearch<String>(
+                    items: (filter, infiniteScrollProps) => _children.map((child) => child['id'] as String).toList(),
+                    selectedItem: _selectedChildId,
+                    decoratorProps: DropDownDecoratorProps(
+                      decoration: InputDecoration(
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide.none,
+                        ),
+                        errorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: Colors.red, width: 1),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
+                        hintText: 'Select a child',
+                        hintStyle: TextStyle(
+                          color: Colors.grey[400],
+                          fontSize: 14,
+                        ),
                       ),
+                      baseStyle: const TextStyle(fontSize: 14),
                     ),
-                    decoration: InputDecoration(
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide.none,
+                    popupProps: PopupProps.menu(
+                      showSearchBox: true,
+                      containerBuilder: (context, popupWidget) {
+                        return Container(
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.surface,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: popupWidget,
+                        );
+                      },
+                      searchFieldProps: TextFieldProps(
+                        decoration: InputDecoration(
+                          hintText: 'Search child...',
+                          hintStyle: const TextStyle(fontSize: 14),
+                          prefixIcon: const Icon(Icons.search),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                        ),
+                        style: const TextStyle(fontSize: 14),
                       ),
-                      errorBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: Colors.red, width: 1),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 14,
-                      ),
-                      isDense: true,
+                      itemBuilder: (context, item, isDisabled, isSelected) {
+                        final child = _children.firstWhere((c) => c['id'] == item);
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          child: Text(
+                            child['name'],
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                        );
+                      },
                     ),
+                    itemAsString: (String id) {
+                      final child = _children.firstWhere((c) => c['id'] == id);
+                      return child['name'];
+                    },
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() {
+                          _selectedChildId = value;
+                          final selectedChild = _children.firstWhere((child) => child['id'] == value);
+                          _selectedChildName = selectedChild['name'];
+                          _parentNameController.text = selectedChild['parentName'] ?? '';
+                        });
+                      }
+                    },
                     validator: (value) {
                       if (value == null || value.isEmpty) {
                         return 'Please select a child';
                       }
                       return null;
-                    },
-                    items: _children.map((child) {
-                      return DropdownMenuItem<String>(
-                        value: child['id'],
-                        child: Text(
-                          child['name'],
-                          style: const TextStyle(fontSize: 14),
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedChildId = value;
-                        final selectedChild = _children.firstWhere((child) => child['id'] == value);
-                        _selectedChildName = selectedChild['name'];
-                        _parentNameController.text = selectedChild['parentName'] ?? '';
-                      });
                     },
                   ),
                 ),
@@ -266,6 +302,11 @@ class _AddSessionScreenState extends State<AddSessionScreen> {
                   ),
                   child: DropdownButtonFormField<String>(
                     value: _selectedTrack,
+                    // style: const TextStyle(
+                    //   fontSize: 18,
+                    //   fontWeight: FontWeight.w400,
+                    //   color: Colors.black87,
+                    // ),
                     hint: Text(
                       'Select track',
                       style: TextStyle(
