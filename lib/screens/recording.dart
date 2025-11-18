@@ -44,6 +44,10 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
   final Codec _codec = Codec.aacADTS;
   final String _fileExtension = 'aac';
 
+  final _sessionFormKey = GlobalKey<FormState>();
+  final TextEditingController _outcomesController = TextEditingController();
+  final TextEditingController _plansController = TextEditingController();
+
   // Recording stages
   RecordingStage _currentStage = RecordingStage.initial;
   String? _recordedFilePath;
@@ -51,6 +55,9 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
   String? _transcriptText;
   String? _docUrl;
   String? _aiSummary;
+  String? _sessionOutcomes;
+  String? _nextSessionPlans;
+  bool _sessionSaved = false;
   String? _sessionId;
   int _recordingDuration = 0;
   bool _isGeneratingTranscript = false;
@@ -245,14 +252,6 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
         _isSavingSession = false;
       });
 
-      // if (mounted) {
-      //   ScaffoldMessenger.of(context).showSnackBar(
-      //     const SnackBar(
-      //       content: Text('Session saved successfully!'),
-      //       backgroundColor: Colors.green,
-      //     ),
-      //   );
-      // }
     } catch (e) {
       print('Error saving session: $e');
       setState(() {
@@ -324,11 +323,7 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
         }),
       );
 
-      print('Function response: ${response}');
-      print('Function response status: ${response.statusCode}');
-      print('Function response body: ${response.body}');
       final result = jsonDecode(response.body);
-      print('Function result: ${result}');
 
       // Check if success is true
       if (result['success'] != true) {
@@ -350,8 +345,6 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
       final transcriptConvo = result['formattedConversation'] ?? '';
       final aiSummary = result['summary'] ?? '';
       final docUrl = result['url'] ?? '';
-      print('transcript: $transcript');
-      print('transcriptConvo: $transcriptConvo');
 
       setState(() {
         _transcriptText = transcriptConvo;
@@ -361,14 +354,6 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
         _isGeneratingTranscript = false;
       });
 
-      // if (mounted) {
-      //   ScaffoldMessenger.of(context).showSnackBar(
-      //     const SnackBar(
-      //       content: Text('Transcript generated successfully!'),
-      //       backgroundColor: Colors.green,
-      //     ),
-      //   );
-      // }
     } catch (e) {
       print('Error generating transcript: $e');
 
@@ -402,16 +387,46 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
 
     try {
       final Uri url = Uri.parse(_docUrl!);
-      if (await canLaunchUrl(url)) {
-        await launchUrl(url, mode: LaunchMode.externalApplication);
-      } else {
-        throw Exception('Could not launch URL');
-      }
+      await launchUrl(url, mode: LaunchMode.externalApplication);
     } catch (e) {
       print('Error opening transcript URL: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error opening transcript: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _saveSessionDetails() async {
+    final outcomes = _outcomesController.text.trim();
+    final plans = _plansController.text.trim();
+
+    try {
+      await FirebaseFirestore.instance.collection("sessions").doc(_sessionId)
+          .update({
+        "outcomes": outcomes,
+        "nextSessionPlans": plans,
+        "updatedAt": FieldValue.serverTimestamp(),
+      });
+
+      setState(() {
+        _nextSessionPlans = outcomes;
+        _sessionOutcomes= plans;
+        _sessionSaved= true;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Session details saved"),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Error saving details"),
           backgroundColor: Colors.red,
         ),
       );
@@ -442,6 +457,8 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
         return 'Generating Transcript';
       case RecordingStage.transcriptGenerated:
         return 'Transcript Generated';
+      case RecordingStage.detailsUpdate:
+        return 'Update Session';
       case RecordingStage.viewingSession:
         return '${widget.childName}';
     }
@@ -459,6 +476,8 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
         return _buildGeneratingTranscriptView();
       case RecordingStage.transcriptGenerated:
         return _buildTranscriptGeneratedView();
+      case RecordingStage.detailsUpdate:
+        return _buildSessionDetailsFormView();
       case RecordingStage.viewingSession:
         return _buildViewSessionView();
     }
@@ -657,10 +676,10 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
             SizedBox(
               width: double.infinity,
               child: CustomButton(
-                text: 'View Session',
+                text: 'Update Session Outcomes',
                 onPressed: () {
                   setState(() {
-                    _currentStage = RecordingStage.viewingSession;
+                    _currentStage = RecordingStage.detailsUpdate;
                   });
                 },
               ),
@@ -671,7 +690,118 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
     );
   }
 
-  // Stage 6: View Session Details
+  // Stage 6: Update session outcomes
+  Widget _buildSessionDetailsFormView() {
+    return SingleChildScrollView(
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Form(
+            key: _sessionFormKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Session Outcomes',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w400,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 8),
+      
+                TextFormField(
+                  controller: _outcomesController,
+                  maxLines: 4,
+                  style: const TextStyle(fontSize: 14),
+                  decoration: InputDecoration(
+                    hintText: '',
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.all(16),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return "Session outcomes are required";
+                    }
+                    return null;
+                  },
+                ),
+      
+                const SizedBox(height: 16),
+      
+                const Text(
+                  'Plans for Next Session',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w400,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _plansController,
+                  maxLines: 4,
+                  style: const TextStyle(fontSize: 14),
+                  decoration: InputDecoration(
+                    hintText: '',
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.all(16),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return "Plans for next session are required";
+                    }
+                    return null;
+                  },
+                ),
+      
+                const SizedBox(height: 32),
+                SizedBox(
+                  width: double.infinity,
+                  child: CustomButton(
+                    text: 'Save Session',
+                    onPressed: () async {
+                      if (_sessionFormKey.currentState!.validate()) {
+                        await _saveSessionDetails();
+                      }
+                    },
+                  ),
+                ),
+      
+                const SizedBox(height: 16),
+      
+                if (_sessionSaved)
+                  SizedBox(
+                    width: double.infinity,
+                    child: CustomButton(
+                      text: 'View Session',
+                      onPressed: () {
+                        setState(() {
+                          _currentStage = RecordingStage.viewingSession;
+                        });
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Stage 7: View Session Details
   Widget _buildViewSessionView() {
     return SingleChildScrollView(
       child: Padding(
@@ -754,18 +884,33 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
             ),
             const SizedBox(height: 20),
 
-            // const Text('Summary', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w400)),
-            // const SizedBox(height: 8),
-            // Container(
-            //   width: double.infinity,
-            //   padding: const EdgeInsets.all(16),
-            //   constraints: const BoxConstraints(minHeight: 100),
-            //   decoration: BoxDecoration(
-            //     color: Colors.white,
-            //     borderRadius: BorderRadius.circular(8),
-            //   ),
-            //   child: Text(_aiSummary ?? 'AI-generated summary will appear here', style: TextStyle(fontSize: 14)),
-            // ),
+            const Text('Outcomes', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w400)),
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              constraints: const BoxConstraints(minHeight: 100),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(_sessionOutcomes ?? '', style: TextStyle(fontSize: 14)),
+            ),
+            const SizedBox(height: 20),
+
+            const Text('Plans for Next Session', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w400)),
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              constraints: const BoxConstraints(minHeight: 100),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(_nextSessionPlans ?? '', style: TextStyle(fontSize: 14)),
+            ),
+            const SizedBox(height: 20),
 
             const Text('Summary', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w400)),
             const SizedBox(height: 8),
@@ -792,5 +937,6 @@ enum RecordingStage {
   recordingComplete,
   generatingTranscript,
   transcriptGenerated,
+  detailsUpdate,
   viewingSession,
 }

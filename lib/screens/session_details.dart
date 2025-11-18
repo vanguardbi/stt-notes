@@ -387,24 +387,43 @@ class _SessionDetailsScreenState extends State<SessionDetailsScreen> {
               ),
               const SizedBox(height: 20),
 
-              // Summary (Placeholder for future AI summary)
-              // const Text('Summary', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w400)),
-              // const SizedBox(height: 8),
-              // Container(
-              //   width: double.infinity,
-              //   padding: const EdgeInsets.all(16),
-              //   constraints: const BoxConstraints(minHeight: 100),
-              //   decoration: BoxDecoration(
-              //     color: Colors.white,
-              //     borderRadius: BorderRadius.circular(8),
-              //   ),
-              //   child: Text(
-              //       _sessionData!['summary']?.isEmpty ?? true
-              //           ? 'AI-generated summary will appear here'
-              //           : _sessionData!['summary'],
-              //     style: TextStyle(fontSize: 14, color: Colors.grey),
-              //   ),
-              // ),
+              const Text('Outcomes', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w400)),
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                constraints: const BoxConstraints(minHeight: 150),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  _sessionData!['outcomes']?.isEmpty ?? true
+                      ? 'No outcomes recorded'
+                      : _sessionData!['outcomes'],
+                  style: const TextStyle(fontSize: 14),
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              const Text('Plans for Next Session', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w400)),
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                constraints: const BoxConstraints(minHeight: 150),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  _sessionData!['nextSessionPlans']?.isEmpty ?? true
+                      ? 'No plans recorded'
+                      : _sessionData!['nextSessionPlans'],
+                  style: const TextStyle(fontSize: 14),
+                ),
+              ),
+              const SizedBox(height: 20),
 
               const Text('Summary', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w400)),
               const SizedBox(height: 8),
