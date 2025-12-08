@@ -1,7 +1,9 @@
 import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:stt/screens/add_track.dart';
 import 'package:stt/screens/recording.dart';
+import 'package:stt/utils/utils.dart';
 import 'package:stt/widget/custom_appbar.dart';
 import 'package:stt/widget/custom_button.dart';
 
@@ -15,21 +17,18 @@ class AddSessionScreen extends StatefulWidget {
 class _AddSessionScreenState extends State<AddSessionScreen> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _parentNameController = TextEditingController();
-  final TextEditingController _notesController = TextEditingController();
 
   String? _selectedChildId;
   String? _selectedChildName;
-  String? _selectedTrack;
   List<Map<String, dynamic>> _children = [];
   bool _isLoadingChildren = true;
   bool _isSaving = false;
-  List<String> _tracks = [];
+  List<TrackWithObjectives> _selectedTracks = [];
 
   @override
   void initState() {
     super.initState();
     _loadChildren();
-    _loadTracks();
   }
 
   Future<void> _loadChildren() async {
@@ -65,27 +64,66 @@ class _AddSessionScreenState extends State<AddSessionScreen> {
     }
   }
 
-  Future<void> _loadTracks() async {
-    try {
-      QuerySnapshot snapshot = await FirebaseFirestore.instance
-          .collection('tracks')
-          .get();
+  void _navigateToAddTrack() async {
+    final result = await Navigator.push<TrackWithObjectives>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddTrackScreen(
+          existingTracks: _selectedTracks.map((t) => t.trackName).toList(),
+        ),
+      ),
+    );
 
+    if (result != null) {
       setState(() {
-        _tracks = snapshot.docs.map((doc) {
-          final data = doc.data() as Map<String, dynamic>?;
-          return data?['name'] ?? 'Unknown';
-        }).cast<String>().toList();
+        _selectedTracks.add(result);
       });
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading tracks: $e'), backgroundColor: Colors.red),
-      );
     }
+  }
+
+  void _editTrack(int index) async {
+    final track = _selectedTracks[index];
+    final result = await Navigator.push<TrackWithObjectives>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddTrackScreen(
+          existingTracks: _selectedTracks
+              .asMap()
+              .entries
+              .where((entry) => entry.key != index)
+              .map((entry) => entry.value.trackName)
+              .toList(),
+          initialTrack: track,
+        ),
+      ),
+    );
+
+    if (result != null) {
+      setState(() {
+        _selectedTracks[index] = result;
+      });
+    }
+  }
+
+  void _removeTrack(int index) {
+    setState(() {
+      _selectedTracks.removeAt(index);
+    });
   }
 
   void _startSession() async {
     if (_formKey.currentState!.validate()) {
+      if (_selectedTracks.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please add at least one track'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+      print(_selectedTracks.map((t) => t.toMap()).toList());
+
       // Navigate to recording screen with session details
       Navigator.push(
         context,
@@ -94,8 +132,7 @@ class _AddSessionScreenState extends State<AddSessionScreen> {
             childId: _selectedChildId!,
             childName: _selectedChildName!,
             parentName: _parentNameController.text.trim(),
-            track: _selectedTrack!,
-            notes: _notesController.text.trim(),
+            tracks: _selectedTracks,
           ),
         ),
       );
@@ -105,7 +142,6 @@ class _AddSessionScreenState extends State<AddSessionScreen> {
   @override
   void dispose() {
     _parentNameController.dispose();
-    _notesController.dispose();
     super.dispose();
   }
 
@@ -113,7 +149,10 @@ class _AddSessionScreenState extends State<AddSessionScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
-      appBar: CustomAppBar(title: 'New Session', showBack: true,),
+      appBar: CustomAppBar(
+        title: 'New Session',
+        showBack: true,
+      ),
       body: Form(
         key: _formKey,
         child: SingleChildScrollView(
@@ -124,7 +163,7 @@ class _AddSessionScreenState extends State<AddSessionScreen> {
               children: [
                 // Child's Name Dropdown
                 const Text(
-                  "Child's Name",
+                  "Client's Name",
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w400,
@@ -149,7 +188,8 @@ class _AddSessionScreenState extends State<AddSessionScreen> {
                     ),
                   )
                       : DropdownSearch<String>(
-                    items: (filter, infiniteScrollProps) => _children.map((child) => child['id'] as String).toList(),
+                    items: (filter, infiniteScrollProps) =>
+                        _children.map((child) => child['id'] as String).toList(),
                     selectedItem: _selectedChildId,
                     decoratorProps: DropDownDecoratorProps(
                       decoration: InputDecoration(
@@ -165,7 +205,7 @@ class _AddSessionScreenState extends State<AddSessionScreen> {
                           horizontal: 16,
                           vertical: 14,
                         ),
-                        hintText: 'Select a child',
+                        hintText: 'Select a client',
                         hintStyle: TextStyle(
                           color: Colors.grey[400],
                           fontSize: 14,
@@ -285,109 +325,132 @@ class _AddSessionScreenState extends State<AddSessionScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // Track Dropdown
-                const Text(
-                  'Track',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w400,
-                    color: Colors.black87,
-                  ),
+                // Tracks Section
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Tracks',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w400,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    TextButton.icon(
+                      onPressed: _navigateToAddTrack,
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('Add Track'),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 8),
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: DropdownButtonFormField<String>(
-                    value: _selectedTrack,
-                    // style: const TextStyle(
-                    //   fontSize: 18,
-                    //   fontWeight: FontWeight.w400,
-                    //   color: Colors.black87,
-                    // ),
-                    hint: Text(
-                      'Select track',
-                      style: TextStyle(
-                        color: Colors.grey[400],
-                        fontSize: 14,
+
+                // Display added tracks
+                if (_selectedTracks.isEmpty)
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      // color: Colors.white,
+                      // borderRadius: BorderRadius.circular(8),
+                      // border: Border.all(color: Colors.grey[300]!),
+                    ),
+                    child: Center(
+                      child: Text(
+                        'No tracks added yet',
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 14,
+                        ),
                       ),
                     ),
-                    decoration: InputDecoration(
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide.none,
-                      ),
-                      errorBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: Colors.red, width: 1),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 14,
-                      ),
-                      isDense: true,
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please select a track';
-                      }
-                      return null;
-                    },
-                    items: _tracks.map((track) {
-                      return DropdownMenuItem<String>(
-                        value: track,
-                        child: Text(
-                          track,
-                          style: const TextStyle(fontSize: 14),
+                  )
+                else
+                  ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: _selectedTracks.length,
+                    separatorBuilder: (context, index) => const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
+                      final track = _selectedTracks[index];
+                      return Container(
+                        decoration: BoxDecoration(
+                          // color: Colors.white,
+                          // borderRadius: BorderRadius.circular(8),
+                          // border: Border.all(color: Colors.grey[300]!),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.all(2),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      track.trackName,
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.edit, size: 18),
+                                    onPressed: () => _editTrack(index),
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  IconButton(
+                                    icon: const Icon(Icons.delete, size: 18, color: Colors.red),
+                                    onPressed: () => _removeTrack(index),
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (track.objectives.isNotEmpty)
+                              Container(
+                                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // const Divider(height: 1),
+                                    // const SizedBox(height: 8),
+                                    Text(
+                                      'Objectives:',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey[600],
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    ...track.objectives.asMap().entries.map((entry) {
+                                      return Padding(
+                                        padding: const EdgeInsets.only(top: 4),
+                                        child: Text(
+                                          '${entry.key + 1}. ${entry.value}',
+                                          style: const TextStyle(fontSize: 13),
+                                        ),
+                                      );
+                                    }).toList(),
+                                  ],
+                                ),
+                              ),
+                          ],
                         ),
                       );
-                    }).toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedTrack = value;
-                      });
                     },
                   ),
-                ),
-                const SizedBox(height: 20),
-
-                // Notes
-                const Text(
-                  'Objectives (Enter each on a new line)',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w400,
-                    color: Colors.black87,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: TextField(
-                    controller: _notesController,
-                    style: const TextStyle(
-                      fontSize: 14,
-                    ),
-                    cursorColor: Colors.black,
-                    maxLines: 8,
-                    decoration: InputDecoration(
-                      hintText: '',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide.none,
-                      ),
-                      contentPadding: const EdgeInsets.all(16),
-                    ),
-                  ),
-                ),
                 const SizedBox(height: 24),
 
-                // Save Session Button
+                // Start Session Button
                 CustomButton(text: 'Start Session', onPressed: _startSession, isLoading: _isSaving,),
               ],
             ),

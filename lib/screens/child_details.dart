@@ -42,17 +42,78 @@ class _ChildDetailsScreenState extends State<ChildDetailsScreen> {
         }).cast<String>().toList();
       });
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading tracks: $e'), backgroundColor: Colors.red),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading tracks: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
+  }
+
+  Stream<QuerySnapshot> _getSessionsStream() {
+    return FirebaseFirestore.instance
+        .collection('sessions')
+        .where('childId', isEqualTo: widget.childId)
+        .orderBy('createdAt', descending: true)
+        .snapshots();
+  }
+
+  String _getDisplayTrackName(Map<String, dynamic> sessionData) {
+    final newTracks = sessionData['tracks'] as List<dynamic>?;
+    if (newTracks != null && newTracks.isNotEmpty) {
+      final trackNames = newTracks.map((trackData) {
+        if (trackData is Map<String, dynamic>) {
+          return trackData['trackName'] as String?;
+        }
+        return null;
+      }).where((name) => name != null).toList();
+
+      if (trackNames.isNotEmpty) {
+        return trackNames.join(', ');
+      }
+    }
+
+    return sessionData['track'] ?? 'Unknown Track';
+  }
+
+  String _getTrackInitial(Map<String, dynamic> sessionData) {
+    final trackName = _getDisplayTrackName(sessionData);
+    final firstChar = trackName.trim().isNotEmpty ? trackName.trim()[0] : 'S';
+    return firstChar.toUpperCase();
+  }
+
+  List<QueryDocumentSnapshot> _filterSessions(List<QueryDocumentSnapshot> allSessions) {
+    if (selectedTrack == 'All Tracks') {
+      return allSessions;
+    }
+
+    return allSessions.where((sessionDoc) {
+      final sessionData = sessionDoc.data() as Map<String, dynamic>;
+
+      final oldTrack = sessionData['track'] as String?;
+      if (oldTrack != null && oldTrack == selectedTrack) {
+        return true;
+      }
+
+      final newTracks = sessionData['tracks'] as List<dynamic>?;
+      if (newTracks != null) {
+        return newTracks.any((trackData) {
+          if (trackData is Map<String, dynamic>) {
+            return trackData['trackName'] == selectedTrack;
+          }
+          return false;
+        });
+      }
+
+      return false;
+    }).toList();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
-      appBar: CustomAppBar(title: '${widget.childName}', showBack: true,),
+      appBar: CustomAppBar(title: widget.childName, showBack: true,),
       body: Column(
         children: [
           // Track Dropdown Section
@@ -128,10 +189,10 @@ class _ChildDetailsScreenState extends State<ChildDetailsScreen> {
             ),
           ),
 
-          // Sessions List
+          // Sessions List (StreamBuilder now uses _getSessionsStream and filters data)
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
-              stream: _getFilteredSessions(),
+              stream: _getSessionsStream(),
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
                   return Center(
@@ -150,7 +211,9 @@ class _ChildDetailsScreenState extends State<ChildDetailsScreen> {
                   );
                 }
 
-                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                final filteredDocs = _filterSessions(snapshot.data!.docs);
+
+                if (filteredDocs.isEmpty) {
                   return Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -177,17 +240,18 @@ class _ChildDetailsScreenState extends State<ChildDetailsScreen> {
 
                 return ListView.builder(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: snapshot.data!.docs.length,
+                  itemCount: filteredDocs.length,
                   itemBuilder: (context, index) {
-                    var sessionData = snapshot.data!.docs[index].data() as Map<String, dynamic>;
-                    String track = sessionData['track'] ?? 'Unknown';
-                    Timestamp? timestamp = sessionData['createdAt'];
-                    String dateStr = '';
+                    var sessionDoc = filteredDocs[index];
+                    var sessionData = sessionDoc.data() as Map<String, dynamic>;
 
-                    if (timestamp != null) {
-                      DateTime date = timestamp.toDate();
-                      dateStr = '${date.day}/${date.month}/${date.year}';
-                    }
+                    String displayTrack = _getDisplayTrackName(sessionData);
+                    String trackInitial = _getTrackInitial(sessionData);
+
+                    Timestamp? timestamp = sessionData['createdAt'];
+                    String dateStr = timestamp != null
+                        ? '${timestamp.toDate().day}/${timestamp.toDate().month}/${timestamp.toDate().year}'
+                        : '';
 
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 12),
@@ -205,7 +269,7 @@ class _ChildDetailsScreenState extends State<ChildDetailsScreen> {
                             radius: 20,
                             backgroundColor: const Color(0xFF00C4B3),
                             child: Text(
-                              track.isNotEmpty ? track[0].toUpperCase() : 'S',
+                              trackInitial,
                               style: const TextStyle(
                                 color: Colors.black87,
                                 fontSize: 16,
@@ -214,7 +278,7 @@ class _ChildDetailsScreenState extends State<ChildDetailsScreen> {
                             ),
                           ),
                           title: Text(
-                            track,
+                            displayTrack,
                             style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
@@ -230,8 +294,8 @@ class _ChildDetailsScreenState extends State<ChildDetailsScreen> {
                           ),
                           onTap: () {
                             // Navigate to session details
-                            print('Tapped on session: $track');
-                            Navigator.push(context, MaterialPageRoute(builder: (context) => SessionDetailsScreen(sessionId: snapshot.data!.docs[index].id,), ),);
+                            print('Tapped on session: $displayTrack');
+                            Navigator.push(context, MaterialPageRoute(builder: (context) => SessionDetailsScreen(sessionId: sessionDoc.id,), ),);
                           },
                         ),
                       ),
@@ -247,27 +311,15 @@ class _ChildDetailsScreenState extends State<ChildDetailsScreen> {
             child: SizedBox(
               width: double.infinity,
               child: CustomButton(
-                text: 'See All Sessions',
-                onPressed: () {
-                  Navigator.push(context, MaterialPageRoute(builder: (context) => const SessionsScreen()));
-                }
+                  text: 'See All Sessions',
+                  onPressed: () {
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => const SessionsScreen()));
+                  }
               ),
             ),
           ),
         ],
       ),
     );
-  }
-
-  Stream<QuerySnapshot> _getFilteredSessions() {
-    Query query = FirebaseFirestore.instance
-        .collection('sessions')
-        .where('childId', isEqualTo: widget.childId);
-
-    if (selectedTrack != 'All Tracks') {
-      query = query.where('track', isEqualTo: selectedTrack);
-    }
-
-    return query.orderBy('createdAt', descending: true).snapshots();
   }
 }

@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:stt/widget/custom_button.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -103,8 +104,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 // Google Sign-In button
                 SizedBox(
                   width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton(
+                  child: CustomButton(
+                    text: 'Sign in with Google',
+                    isLoading: _isSigningIn,
                     onPressed: _isSigningIn
                         ? null
                         : () async {
@@ -117,28 +119,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             Text('Signed in successfully!'),
                           ),
                         );
-                        // Example: navigate to home
                         // Navigator.pushReplacementNamed(context, '/home');
                       }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Color(0xFF00C4B3),
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: _isSigningIn
-                        ? const CircularProgressIndicator(
-                      color: Colors.black87,
-                    )
-                        : const Text(
-                      'Sign in with Google',
-                      style: TextStyle(
-                        color: Colors.black87,
-                        fontSize: 16,
-                      ),
-                    ),
+                    }
                   ),
                 ),
               ],

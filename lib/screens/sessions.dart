@@ -12,7 +12,7 @@ class SessionsScreen extends StatefulWidget {
 
 class _SessionsScreenState extends State<SessionsScreen> {
   String _selectedChildId = 'all';
-  String _selectedChildName = 'All Children';
+  String _selectedChildName = 'All Clients';
   Map<String, String> _childrenMap = {}; // Map of id -> childName
   bool _isLoadingChildren = true;
 
@@ -32,8 +32,8 @@ class _SessionsScreenState extends State<SessionsScreen> {
       Map<String, String> childrenMap = {};
       for (var doc in childrenSnapshot.docs) {
         var data = doc.data() as Map<String, dynamic>;
-        String childId = doc.id; // Document ID
-        String childName = data['childName'] ?? 'Unknown Child';
+        String childId = doc.id;
+        String childName = data['childName'] ?? 'Unknown Client';
         childrenMap[childId] = childName;
       }
 
@@ -65,7 +65,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
   }
 
   String _getChildNameById(String childId) {
-    return _childrenMap[childId] ?? 'Unknown Child';
+    return _childrenMap[childId] ?? 'Unknown Client';
   }
 
   @override
@@ -112,7 +112,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
                 items: [
                   const DropdownMenuItem<String>(
                     value: 'all',
-                    child: Text('All Children'),
+                    child: Text('All Clients'),
                   ),
                   ..._childrenMap.entries.map((entry) {
                     return DropdownMenuItem<String>(
@@ -126,8 +126,8 @@ class _SessionsScreenState extends State<SessionsScreen> {
                     setState(() {
                       _selectedChildId = newValue;
                       _selectedChildName = newValue == 'all'
-                          ? 'All Children'
-                          : _childrenMap[newValue] ?? 'Unknown Child';
+                          ? 'All Clients'
+                          : _childrenMap[newValue] ?? 'Unknown Client';
                     });
                   }
                 },
