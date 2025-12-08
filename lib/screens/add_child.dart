@@ -152,7 +152,7 @@ class _AddChildScreenState extends State<AddChildScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
-      appBar: CustomAppBar(title: 'New Child', showBack: true,),
+      appBar: CustomAppBar(title: 'New Client', showBack: true,),
       body: Form(
         key: _formKey,
         child: SingleChildScrollView(
@@ -162,7 +162,7 @@ class _AddChildScreenState extends State<AddChildScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  "Child's Name",
+                  "Client's Name",
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w400,
@@ -183,7 +183,7 @@ class _AddChildScreenState extends State<AddChildScreen> {
                     cursorColor: Colors.black,
                     validator: (value) {
                       if (value == null || value.trim().isEmpty) {
-                        return 'Please enter child\'s name';
+                        return 'Please enter client\'s name';
                       }
                       return null;
                     },

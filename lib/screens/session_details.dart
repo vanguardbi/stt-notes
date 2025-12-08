@@ -60,7 +60,7 @@ class _SessionDetailsScreenState extends State<SessionDetailsScreen> {
 
       // Fetch child name using childId
       String childId = sessionData['childId'] ?? '';
-      String childName = 'Unknown Child';
+      String childName = 'Unknown Client';
 
       if (childId.isNotEmpty) {
         DocumentSnapshot childDoc = await FirebaseFirestore.instance
@@ -70,7 +70,7 @@ class _SessionDetailsScreenState extends State<SessionDetailsScreen> {
 
         if (childDoc.exists) {
           Map<String, dynamic> childData = childDoc.data() as Map<String, dynamic>;
-          childName = childData['childName'] ?? 'Unknown Child';
+          childName = childData['childName'] ?? 'Unknown Client';
         }
       }
 
@@ -151,11 +151,11 @@ class _SessionDetailsScreenState extends State<SessionDetailsScreen> {
 
     try {
       final Uri url = Uri.parse(_sessionData!['url']!);
-      if (await canLaunchUrl(url)) {
+      // if (await canLaunchUrl(url)) {
         await launchUrl(url, mode: LaunchMode.externalApplication);
-      } else {
-        throw Exception('Could not launch URL');
-      }
+      // } else {
+      //   throw Exception('Could not launch URL');
+      // }
     } catch (e) {
       print('Error opening transcript URL: $e');
       ScaffoldMessenger.of(context).showSnackBar(
@@ -210,7 +210,6 @@ class _SessionDetailsScreenState extends State<SessionDetailsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Child Name Header
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
@@ -222,7 +221,7 @@ class _SessionDetailsScreenState extends State<SessionDetailsScreen> {
                     const Icon(Icons.person, size: 16),
                     const SizedBox(width: 8),
                     Text(
-                      _childName ?? 'Unknown Child',
+                      _childName ?? 'Unknown Client',
                       style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
                     ),
                   ],
@@ -230,8 +229,7 @@ class _SessionDetailsScreenState extends State<SessionDetailsScreen> {
               ),
               const SizedBox(height: 20),
 
-              // Child Name
-              const Text('Child Name', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w400)),
+              const Text('Client Name', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w400)),
               const SizedBox(height: 8),
               Container(
                 width: double.infinity,
@@ -240,7 +238,7 @@ class _SessionDetailsScreenState extends State<SessionDetailsScreen> {
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Text(_childName ?? 'Unknown Child', style: const TextStyle(fontSize: 14)),
+                child: Text(_childName ?? 'Unknown Client', style: const TextStyle(fontSize: 14)),
               ),
               const SizedBox(height: 20),
 
@@ -261,22 +259,78 @@ class _SessionDetailsScreenState extends State<SessionDetailsScreen> {
               ),
               const SizedBox(height: 20),
 
-              // Track
-              const Text('Track', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w400)),
+              const Text('Tracks & Objectives', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w400)),
               const SizedBox(height: 8),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
+
+              // Check if tracks data exists and is a list
+              if (_sessionData!['tracks'] is List && (_sessionData!['tracks'] as List).isNotEmpty)
+                ...(_sessionData!['tracks'] as List).map((trackData) {
+                  // Ensure trackData is a Map and has a 'name'
+                  if (trackData is Map<String, dynamic>) {
+                    final String trackName = trackData['trackName'] ?? 'Unnamed Track';
+                    final List<dynamic> objectives = trackData['objectives'] is List ? trackData['objectives'] as List : [];
+
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 20.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE0E0E0), // Slightly different color for the track header
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              'Track: $trackName',
+                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+
+                          // Objectives List Container
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: objectives.isEmpty
+                                ? const Text('No objectives for this track.', style: TextStyle(fontSize: 14, fontStyle: FontStyle.italic))
+                                : Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: objectives.asMap().entries.map((entry) {
+                                final int index = entry.key;
+                                final String objective = entry.value.toString();
+                                return Padding(
+                                  padding: EdgeInsets.only(top: index == 0 ? 0 : 8.0),
+                                  child: Text(
+                                    '• $objective',
+                                    style: const TextStyle(fontSize: 14),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                  return const SizedBox.shrink(); // Fallback for malformed track data
+                }).toList()
+              else
+              // Fallback if 'tracks' array is missing or empty
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text('No tracks and objectives recorded.', style: TextStyle(fontSize: 14)),
                 ),
-                child: Text(
-                  _sessionData!['track'] ?? 'N/A',
-                  style: const TextStyle(fontSize: 14),
-                ),
-              ),
-              const SizedBox(height: 20),
 
               // Session Date and Duration
               Row(
@@ -344,25 +398,6 @@ class _SessionDetailsScreenState extends State<SessionDetailsScreen> {
                     _isPlaying ? 'Stop Recording' : 'Listen to Recording',
                     style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
                   ),
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // Notes
-              const Text('Objectives', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w400)),
-              const SizedBox(height: 8),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  _sessionData!['notes']?.isEmpty ?? true
-                      ? 'No objectives'
-                      : _sessionData!['notes'],
-                  style: const TextStyle(fontSize: 14),
                 ),
               ),
               const SizedBox(height: 20),

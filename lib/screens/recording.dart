@@ -3,8 +3,15 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:stt/utils/utils.dart';
 import 'package:stt/widget/custom_appbar.dart';
-import 'package:stt/widget/custom_button.dart';
+import 'package:stt/widget/recording/generated_transcript.dart';
+import 'package:stt/widget/recording/generating_transcript.dart';
+import 'package:stt/widget/recording/initial_view.dart';
+import 'package:stt/widget/recording/recording_complete.dart';
+import 'package:stt/widget/recording/recording_outcomes.dart';
+import 'package:stt/widget/recording/recording_view.dart';
+import 'package:stt/widget/recording/view_session.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:vibration/vibration.dart';
 import 'package:flutter_sound/flutter_sound.dart';
@@ -16,20 +23,18 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:http/http.dart' as http;
 
-class RecordingSessionScreen extends StatefulWidget {
+  class RecordingSessionScreen extends StatefulWidget {
   final String childId;
   final String childName;
   final String parentName;
-  final String track;
-  final String notes;
+  final List<TrackWithObjectives> tracks;
 
   const RecordingSessionScreen({
     Key? key,
     required this.childId,
     required this.childName,
     required this.parentName,
-    required this.track,
-    required this.notes,
+    required this.tracks,
   }) : super(key: key);
 
   @override
@@ -44,7 +49,6 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
   final Codec _codec = Codec.aacADTS;
   final String _fileExtension = 'aac';
 
-  final _sessionFormKey = GlobalKey<FormState>();
   final TextEditingController _outcomesController = TextEditingController();
   final TextEditingController _plansController = TextEditingController();
 
@@ -229,6 +233,8 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
       _downloadURL = await uploadTask.ref.getDownloadURL();
       print('File uploaded: $_downloadURL');
 
+      final tracksData = widget.tracks.map((track) => track.toMap()).toList();
+
       // Create session document
       final docRef = FirebaseFirestore.instance.collection('sessions').doc();
       await docRef.set({
@@ -236,8 +242,7 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
         'childId': widget.childId,
         'childName': widget.childName,
         'parentName': widget.parentName,
-        'track': widget.track,
-        'notes': widget.notes,
+        'tracks': tracksData,
         'audioUrl': _downloadURL,
         'duration': _recordingDuration ~/ 1000, // Convert to seconds
         'transcript': '', // Will be updated by Cloud Function
@@ -306,6 +311,8 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
 
       final user = FirebaseAuth.instance.currentUser;
       final idToken = await user?.getIdToken();
+      final tracksData = widget.tracks.map((track) => track.toMap()).toList();
+      final plans = _plansController.text.trim();
 
       final response = await http.post(
         Uri.parse(functionUrl),
@@ -318,8 +325,8 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
           'childId': widget.childId,
           'sessionId': _sessionId,
           'name': widget.childName,
-          'track': widget.track,
-          'objectives': widget.notes,
+          'tracks': tracksData,
+          'nextSessionPlans': plans,
         }),
       );
 
@@ -412,8 +419,8 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
       });
 
       setState(() {
-        _nextSessionPlans = outcomes;
-        _sessionOutcomes= plans;
+        _nextSessionPlans = plans;
+        _sessionOutcomes= outcomes;
         _sessionSaved= true;
       });
 
@@ -431,10 +438,6 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
         ),
       );
     }
-  }
-
-  String _formatDuration(int milliseconds) {
-    return StopWatchTimer.getDisplayTime(milliseconds, hours: true, milliSecond: false);
   }
 
   @override
@@ -485,458 +488,87 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
 
   // Stage 1: Initial - Start Session Button
   Widget _buildInitialView() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.only(top: 40.0, left: 24.0, right: 24.0, bottom: 24.0),
-        child: Column(
-          children: [
-            Icon(Icons.mic, size: 80, color: Colors.grey[400]),
-            const SizedBox(height: 24),
-            Text(
-              'Ready to record',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w600, color: Colors.grey[700]),
-            ),
-            const SizedBox(height: 48),
-            SizedBox(
-              width: double.infinity,
-              child: CustomButton(text: 'Start Session', onPressed: startRecording,),
-            ),
-          ],
-        ),
-      ),
-    );
+    return InitialRecordingView(startRecording: startRecording);
   }
 
   // Stage 2: Recording View
   Widget _buildRecordingView() {
     final isRecording = _recordingSession.isRecording;
 
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.only(top: 40.0, left: 24.0, right: 24.0, bottom: 24.0),
-        child: Column(
-          children: [
-            StreamBuilder<int>(
-              stream: _stopWatchTimer.rawTime,
-              initialData: _stopWatchTimer.rawTime.value,
-              builder: (context, snapshot) {
-                final value = snapshot.data!;
-                final displayTime = StopWatchTimer.getDisplayTime(value, hours: true, milliSecond: false);
-                return Text(
-                  displayTime,
-                  style: const TextStyle(fontSize: 64, color: Colors.black87),
-                );
-              },
-            ),
-
-            const SizedBox(height: 48),
-
-            // Waveform
-            Container(
-              height: 150,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey[300]!),
-              ),
-              child: Center(
-                child: Icon(Icons.graphic_eq, size: 80, color: Colors.grey[400]),
-              ),
-            ),
-
-            const SizedBox(height: 48),
-
-            // Control buttons
-            Row(
-              children: [
-                // Pause/Resume button
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE0E0E0),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: IconButton(
-                    icon: Icon(isRecording ? Icons.pause : Icons.play_arrow, size: 30),
-                    onPressed: isRecording ? pauseRecording : resumeRecording,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                // Stop button
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE0E0E0),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: IconButton(
-                    icon: const Icon(Icons.stop, size: 30),
-                    onPressed: stopRecording,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
+    return RecordingView(
+      isRecording: isRecording,
+      stopWatchTimer: _stopWatchTimer,
+      pauseRecording: pauseRecording,
+      resumeRecording: resumeRecording,
+      stopRecording: stopRecording
     );
   }
 
   // Stage 3: Recording Complete View
   Widget _buildRecordingCompleteView() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.only(top: 40.0, left: 24.0, right: 24.0, bottom: 24.0),
-        child: Column(
-          children: [
-            Text(
-              widget.childName,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              _formatDuration(_recordingDuration),
-              style: const TextStyle(fontSize: 64, color: Colors.black87),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              _isSavingSession ? 'Saving session...' : 'Recording Complete',
-              style: const TextStyle(fontSize: 14, color: Colors.black54),
-            ),
-            const SizedBox(height: 48),
-            SizedBox(
-              width: double.infinity,
-              child: CustomButton(text: 'Generate Transcript', onPressed: _isSavingSession ? null : generateTranscript, isLoading: _isSavingSession,),
-            ),
-          ],
-        ),
-      ),
+    return RecordingCompleteView(
+      childName: widget.childName,
+      recordingDuration: _recordingDuration,
+      isSavingSession: _isSavingSession,
+      onUpdateOutcomes: () { setState(() { _currentStage = RecordingStage.detailsUpdate; }); }
     );
   }
 
-  // Stage 4: Generating Transcript View
-  Widget _buildGeneratingTranscriptView() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.only(top: 40.0, left: 24.0, right: 24.0, bottom: 24.0),
-        child: Column(
-          children: [
-            Text(
-              widget.childName,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              _formatDuration(_recordingDuration),
-              style: const TextStyle(fontSize: 64, color: Colors.black87),
-            ),
-            const SizedBox(height: 48),
-            const LinearProgressIndicator(
-              minHeight: 6,
-              borderRadius: BorderRadius.all(Radius.circular(8)),
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.black54),
-              backgroundColor: Color(0xFFE0E0E0),
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              'Generating Transcript...',
-              style: TextStyle(fontSize: 14, color: Colors.black54),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // Stage 5: Transcript Generated View
-  Widget _buildTranscriptGeneratedView() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          children: [
-            Text(
-              widget.childName,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              _formatDuration(_recordingDuration),
-              style: const TextStyle(fontSize: 64, color: Colors.black87),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Transcript Generated',
-              style: TextStyle(fontSize: 14, color: Colors.black54),
-            ),
-            const SizedBox(height: 48),
-            SizedBox(
-              width: double.infinity,
-              child: CustomButton(
-                text: 'Update Session Outcomes',
-                onPressed: () {
-                  setState(() {
-                    _currentStage = RecordingStage.detailsUpdate;
-                  });
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // Stage 6: Update session outcomes
+  // Stage 4: Update session outcomes
   Widget _buildSessionDetailsFormView() {
-    return SingleChildScrollView(
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Form(
-            key: _sessionFormKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Session Outcomes',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w400,
-                    color: Colors.black87,
-                  ),
-                ),
-                const SizedBox(height: 8),
-      
-                TextFormField(
-                  controller: _outcomesController,
-                  maxLines: 4,
-                  style: const TextStyle(fontSize: 14),
-                  decoration: InputDecoration(
-                    hintText: '',
-                    filled: true,
-                    fillColor: Colors.white,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide.none,
-                    ),
-                    contentPadding: const EdgeInsets.all(16),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return "Session outcomes are required";
-                    }
-                    return null;
-                  },
-                ),
-      
-                const SizedBox(height: 16),
-      
-                const Text(
-                  'Plans for Next Session',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w400,
-                    color: Colors.black87,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextFormField(
-                  controller: _plansController,
-                  maxLines: 4,
-                  style: const TextStyle(fontSize: 14),
-                  decoration: InputDecoration(
-                    hintText: '',
-                    filled: true,
-                    fillColor: Colors.white,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide.none,
-                    ),
-                    contentPadding: const EdgeInsets.all(16),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return "Plans for next session are required";
-                    }
-                    return null;
-                  },
-                ),
-      
-                const SizedBox(height: 32),
-                SizedBox(
-                  width: double.infinity,
-                  child: CustomButton(
-                    text: 'Save Session',
-                    onPressed: () async {
-                      if (_sessionFormKey.currentState!.validate()) {
-                        await _saveSessionDetails();
-                      }
-                    },
-                  ),
-                ),
-      
-                const SizedBox(height: 16),
-      
-                if (_sessionSaved)
-                  SizedBox(
-                    width: double.infinity,
-                    child: CustomButton(
-                      text: 'View Session',
-                      onPressed: () {
-                        setState(() {
-                          _currentStage = RecordingStage.viewingSession;
-                        });
-                      },
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ),
-      ),
+    return RecordingOutcomesView(
+      recordingDuration: _recordingDuration,
+      outcomesController: _outcomesController,
+      plansController: _plansController,
+      sessionSaved: _sessionSaved,
+      onSaveDetails: () async {
+        await _saveSessionDetails();
+      },
+      onGenerateTranscript: generateTranscript,
+    );
+  }
+
+  // Stage 5: Generating Transcript View
+  Widget _buildGeneratingTranscriptView() {
+    return GeneratingTranscriptView(childName: widget.childName, recordingDuration: _recordingDuration);
+  }
+
+  // Stage 6: Transcript Generated View
+  Widget _buildTranscriptGeneratedView() {
+    return GeneratedTranscriptView(
+      childName: widget.childName,
+      recordingDuration: _recordingDuration,
+      onViewSession: () {
+        setState(() {
+          _currentStage = RecordingStage.viewingSession;
+        });
+      },
     );
   }
 
   // Stage 7: View Session Details
   Widget _buildViewSessionView() {
-    return SingleChildScrollView(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 20),
-
-            const Text('Child\'s Name', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w400)),
-            const SizedBox(height: 8),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(widget.childName, style: const TextStyle(fontSize: 14)),
-            ),
-            const SizedBox(height: 20),
-
-            const Text("Parent's Name", style: TextStyle(fontSize: 14, fontWeight: FontWeight.w400)),
-            const SizedBox(height: 8),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(widget.parentName, style: const TextStyle(fontSize: 14)),
-            ),
-            const SizedBox(height: 20),
-
-            // Listen to Recording Button
-            SizedBox(
-              width: double.infinity,
-              child: CustomButton(
-                text: 'Listen to Recording',
-                onPressed: () async {
-                  if (_downloadURL != null) {
-                    try {
-                      await _audioPlayer.startPlayer(fromURI: _downloadURL!);
-                    } catch (e) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Error playing audio: $e'), backgroundColor: Colors.red),
-                      );
-                    }
-                  }
-                },
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            const Text('Objectives', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w400)),
-            const SizedBox(height: 8),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(widget.notes.isEmpty ? 'No objectives' : widget.notes, style: const TextStyle(fontSize: 14)),
-            ),
-            const SizedBox(height: 20),
-
-            const Text('Transcript', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w400)),
-            const SizedBox(height: 8),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              constraints: const BoxConstraints(minHeight: 150),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(_transcriptText ?? 'No transcript available', style: const TextStyle(fontSize: 14)),
-            ),
-            const SizedBox(height: 20),
-
-            const Text('Outcomes', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w400)),
-            const SizedBox(height: 8),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              constraints: const BoxConstraints(minHeight: 100),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(_sessionOutcomes ?? '', style: TextStyle(fontSize: 14)),
-            ),
-            const SizedBox(height: 20),
-
-            const Text('Plans for Next Session', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w400)),
-            const SizedBox(height: 8),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              constraints: const BoxConstraints(minHeight: 100),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(_nextSessionPlans ?? '', style: TextStyle(fontSize: 14)),
-            ),
-            const SizedBox(height: 20),
-
-            const Text('Summary', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w400)),
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: CustomButton(
-                text: 'View Summary in Google Docs',
-                onPressed: _docUrl != null && _docUrl!.isNotEmpty
-                    ? _openTranscriptUrl
-                    : null,
-              ),
-            ),
-            const SizedBox(height: 20),
-          ],
-        ),
-      ),
+    return ViewSessionView(
+        childName: widget.childName,
+        parentName: widget.parentName,
+        notes: '',
+        downloadURL: _downloadURL,
+        transcriptText: _transcriptText,
+        sessionOutcomes: _sessionOutcomes,
+        nextSessionPlans: _nextSessionPlans,
+        docUrl: _docUrl,
+        onListenToRecording: () async {
+          if (_downloadURL != null) {
+            try {
+              await _audioPlayer.startPlayer(fromURI: _downloadURL!);
+            } catch (e) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Error playing audio: $e'), backgroundColor: Colors.red),
+              );
+            }
+          }
+        },
+        onOpenTranscriptUrl: _openTranscriptUrl
     );
   }
-}
-
-enum RecordingStage {
-  initial,
-  recording,
-  recordingComplete,
-  generatingTranscript,
-  transcriptGenerated,
-  detailsUpdate,
-  viewingSession,
 }

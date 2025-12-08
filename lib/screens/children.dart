@@ -21,11 +21,11 @@ class _ChildrenListScreenState extends State<ChildrenListScreen> {
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: CustomAppBar(
-        title: 'Children',
+        title: 'Clients',
         showBack: true,
         actions: [
         IconButton(
-          icon: const Icon(Icons.add, color: Colors.white, size: 20),
+          icon: const Icon(Icons.add, color: Colors.white, size: 30),
           onPressed: () => Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const AddChildScreen()),
