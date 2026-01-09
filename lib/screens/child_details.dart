@@ -4,6 +4,7 @@ import 'package:stt/screens/session_details.dart';
 import 'package:stt/screens/sessions.dart';
 import 'package:stt/widget/custom_appbar.dart';
 import 'package:stt/widget/custom_button.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ChildDetailsScreen extends StatefulWidget {
   final String childId;
@@ -20,28 +21,32 @@ class ChildDetailsScreen extends StatefulWidget {
 }
 
 class _ChildDetailsScreenState extends State<ChildDetailsScreen> {
+  final supabase = Supabase.instance.client;
   String selectedTrack = 'All Tracks';
   List<String> tracks = [];
+
+  bool isLoadingTracks = true;
+  bool isLoadingSessions = true;
+
+  List<Map<String, dynamic>> sessions = [];
 
   @override
   void initState() {
     super.initState();
     _loadTracks();
+    _loadSessions();
   }
 
   Future<void> _loadTracks() async {
     try {
-      QuerySnapshot snapshot = await FirebaseFirestore.instance
-          .collection('tracks')
-          .get();
+      final response = await supabase.from('tracks').select('name').order('name');
 
       setState(() {
-        tracks = snapshot.docs.map((doc) {
-          final data = doc.data() as Map<String, dynamic>?;
-          return data?['name'] ?? 'Unknown';
-        }).cast<String>().toList();
+        tracks = response.map<String>((e) => e['name'] as String).toList();
+        isLoadingTracks = false;
       });
     } catch (e) {
+      isLoadingTracks = false;
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error loading tracks: $e'), backgroundColor: Colors.red),
@@ -50,12 +55,30 @@ class _ChildDetailsScreenState extends State<ChildDetailsScreen> {
     }
   }
 
-  Stream<QuerySnapshot> _getSessionsStream() {
-    return FirebaseFirestore.instance
-        .collection('sessions')
-        .where('childId', isEqualTo: widget.childId)
-        .orderBy('createdAt', descending: true)
-        .snapshots();
+  // Stream<QuerySnapshot> _getSessionsStream() {
+  //   return FirebaseFirestore.instance
+  //       .collection('sessions')
+  //       .where('childId', isEqualTo: widget.childId)
+  //       .orderBy('createdAt', descending: true)
+  //       .snapshots();
+  // }
+
+  Future<void> _loadSessions() async {
+    try {
+      final response = await supabase
+          .from('sessions')
+          .select('id, created_at, tracks')
+          .eq('child_id', widget.childId)
+          .order('created_at', ascending: false);
+
+      setState(() {
+        sessions = List<Map<String, dynamic>>.from(response);
+        isLoadingSessions = false;
+      });
+    } catch (e) {
+      isLoadingSessions = false;
+      _showError('Error loading sessions: $e');
+    }
   }
 
   String _getDisplayTrackName(Map<String, dynamic> sessionData) {
@@ -82,35 +105,77 @@ class _ChildDetailsScreenState extends State<ChildDetailsScreen> {
     return firstChar.toUpperCase();
   }
 
-  List<QueryDocumentSnapshot> _filterSessions(List<QueryDocumentSnapshot> allSessions) {
+  // List<QueryDocumentSnapshot> _filterSessions(List<QueryDocumentSnapshot> allSessions) {
+  //   if (selectedTrack == 'All Tracks') {
+  //     return allSessions;
+  //   }
+  //
+  //   return allSessions.where((sessionDoc) {
+  //     final sessionData = sessionDoc.data() as Map<String, dynamic>;
+  //
+  //     final oldTrack = sessionData['track'] as String?;
+  //     if (oldTrack != null && oldTrack == selectedTrack) {
+  //       return true;
+  //     }
+  //
+  //     final newTracks = sessionData['tracks'] as List<dynamic>?;
+  //     if (newTracks != null) {
+  //       return newTracks.any((trackData) {
+  //         if (trackData is Map<String, dynamic>) {
+  //           return trackData['trackName'] == selectedTrack;
+  //         }
+  //         return false;
+  //       });
+  //     }
+  //
+  //     return false;
+  //   }).toList();
+  // }
+
+  List<Map<String, dynamic>> _filteredSessions() {
     if (selectedTrack == 'All Tracks') {
-      return allSessions;
+      return sessions;
     }
 
-    return allSessions.where((sessionDoc) {
-      final sessionData = sessionDoc.data() as Map<String, dynamic>;
+    return sessions.where((session) {
+      final tracksData = session['tracks'] as List<dynamic>?;
 
-      final oldTrack = sessionData['track'] as String?;
-      if (oldTrack != null && oldTrack == selectedTrack) {
-        return true;
-      }
+      if (tracksData == null) return false;
 
-      final newTracks = sessionData['tracks'] as List<dynamic>?;
-      if (newTracks != null) {
-        return newTracks.any((trackData) {
-          if (trackData is Map<String, dynamic>) {
-            return trackData['trackName'] == selectedTrack;
-          }
-          return false;
-        });
-      }
-
-      return false;
+      return tracksData.any((track) =>
+      track is Map &&
+          track['trackName'] == selectedTrack);
     }).toList();
+  }
+
+  String _displayTrackName(Map<String, dynamic> session) {
+    final tracksData = session['tracks'] as List<dynamic>?;
+
+    if (tracksData != null && tracksData.isNotEmpty) {
+      return tracksData
+          .map((e) => e['trackName'])
+          .whereType<String>()
+          .join(', ');
+    }
+
+    return 'Unknown Track';
+  }
+
+  String _trackInitial(String name) {
+    return name.isNotEmpty ? name[0].toUpperCase() : 'S';
+  }
+
+  void _showError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final filteredSessions = _filteredSessions();
+
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: CustomAppBar(title: widget.childName, showBack: true,),
@@ -138,7 +203,12 @@ class _ChildDetailsScreenState extends State<ChildDetailsScreen> {
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: DropdownButton<String>(
+                  child: isLoadingTracks
+                      ? const Padding(
+                        padding: EdgeInsets.all(12),
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                      : DropdownButton<String>(
                     isExpanded: true,
                     value: selectedTrack,
                     underline: const SizedBox(),
@@ -190,117 +260,185 @@ class _ChildDetailsScreenState extends State<ChildDetailsScreen> {
           ),
 
           // Sessions List (StreamBuilder now uses _getSessionsStream and filters data)
+          // Expanded(
+          //   child: StreamBuilder<QuerySnapshot>(
+          //     stream: _getSessionsStream(),
+          //     builder: (context, snapshot) {
+          //       if (snapshot.hasError) {
+          //         return Center(
+          //           child: Text(
+          //             'Error: ${snapshot.error}',
+          //             style: const TextStyle(color: Colors.red),
+          //           ),
+          //         );
+          //       }
+          //
+          //       if (snapshot.connectionState == ConnectionState.waiting) {
+          //         return const Center(
+          //           child: CircularProgressIndicator(
+          //             valueColor: AlwaysStoppedAnimation<Color>(Colors.black54),
+          //           ),
+          //         );
+          //       }
+          //
+          //       final filteredDocs = _filterSessions(snapshot.data!.docs);
+          //
+          //       if (filteredDocs.isEmpty) {
+          //         return Center(
+          //           child: Column(
+          //             mainAxisAlignment: MainAxisAlignment.center,
+          //             children: [
+          //               Icon(
+          //                 Icons.folder_open,
+          //                 size: 64,
+          //                 color: Colors.grey[400],
+          //               ),
+          //               const SizedBox(height: 16),
+          //               Text(
+          //                 selectedTrack != 'All Tracks'
+          //                     ? 'No sessions for $selectedTrack'
+          //                     : 'No sessions yet',
+          //                 style: TextStyle(
+          //                   fontSize: 16,
+          //                   color: Colors.grey[600],
+          //                 ),
+          //               ),
+          //             ],
+          //           ),
+          //         );
+          //       }
+          //
+          //       return ListView.builder(
+          //         padding: const EdgeInsets.symmetric(horizontal: 16),
+          //         itemCount: filteredDocs.length,
+          //         itemBuilder: (context, index) {
+          //           var sessionDoc = filteredDocs[index];
+          //           var sessionData = sessionDoc.data() as Map<String, dynamic>;
+          //
+          //           String displayTrack = _getDisplayTrackName(sessionData);
+          //           String trackInitial = _getTrackInitial(sessionData);
+          //
+          //           Timestamp? timestamp = sessionData['createdAt'];
+          //           String dateStr = timestamp != null
+          //               ? '${timestamp.toDate().day}/${timestamp.toDate().month}/${timestamp.toDate().year}'
+          //               : '';
+          //
+          //           return Padding(
+          //             padding: const EdgeInsets.only(bottom: 12),
+          //             child: Container(
+          //               decoration: BoxDecoration(
+          //                 color: Colors.white,
+          //                 borderRadius: BorderRadius.circular(8),
+          //               ),
+          //               child: ListTile(
+          //                 contentPadding: const EdgeInsets.symmetric(
+          //                   horizontal: 16,
+          //                   vertical: 8,
+          //                 ),
+          //                 leading: CircleAvatar(
+          //                   radius: 20,
+          //                   backgroundColor: const Color(0xFF00C4B3),
+          //                   child: Text(
+          //                     trackInitial,
+          //                     style: const TextStyle(
+          //                       color: Colors.black87,
+          //                       fontSize: 16,
+          //                       fontWeight: FontWeight.w500,
+          //                     ),
+          //                   ),
+          //                 ),
+          //                 title: Text(
+          //                   displayTrack,
+          //                   style: const TextStyle(
+          //                     fontSize: 14,
+          //                     fontWeight: FontWeight.w500,
+          //                     color: Colors.black87,
+          //                   ),
+          //                 ),
+          //                 trailing: Text(
+          //                   dateStr,
+          //                   style: TextStyle(
+          //                     fontSize: 12,
+          //                     color: Colors.grey[600],
+          //                   ),
+          //                 ),
+          //                 onTap: () {
+          //                   // Navigate to session details
+          //                   print('Tapped on session: $displayTrack');
+          //                   Navigator.push(context, MaterialPageRoute(builder: (context) => SessionDetailsScreen(sessionId: sessionDoc.id,), ),);
+          //                 },
+          //               ),
+          //             ),
+          //           );
+          //         },
+          //       );
+          //     },
+          //   ),
+          // ),
           Expanded(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: _getSessionsStream(),
-              builder: (context, snapshot) {
-                if (snapshot.hasError) {
-                  return Center(
-                    child: Text(
-                      'Error: ${snapshot.error}',
-                      style: const TextStyle(color: Colors.red),
+            child: isLoadingSessions
+                ? const Center(child: CircularProgressIndicator())
+                : filteredSessions.isEmpty
+                ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.folder_open,
+                      size: 64, color: Colors.grey[400]),
+                  const SizedBox(height: 16),
+                  Text(
+                    selectedTrack == 'All Tracks'
+                        ? 'No sessions yet'
+                        : 'No sessions for $selectedTrack',
+                    style: TextStyle(color: Colors.grey[600]),
+                  ),
+                ],
+              ),
+            )
+                : ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: filteredSessions.length,
+              itemBuilder: (context, index) {
+                final session = filteredSessions[index];
+                final trackName = _displayTrackName(session);
+                final createdAt =
+                DateTime.parse(session['created_at']);
+
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                  );
-                }
-
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(
-                    child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.black54),
-                    ),
-                  );
-                }
-
-                final filteredDocs = _filterSessions(snapshot.data!.docs);
-
-                if (filteredDocs.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.folder_open,
-                          size: 64,
-                          color: Colors.grey[400],
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          selectedTrack != 'All Tracks'
-                              ? 'No sessions for $selectedTrack'
-                              : 'No sessions yet',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-
-                return ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: filteredDocs.length,
-                  itemBuilder: (context, index) {
-                    var sessionDoc = filteredDocs[index];
-                    var sessionData = sessionDoc.data() as Map<String, dynamic>;
-
-                    String displayTrack = _getDisplayTrackName(sessionData);
-                    String trackInitial = _getTrackInitial(sessionData);
-
-                    Timestamp? timestamp = sessionData['createdAt'];
-                    String dateStr = timestamp != null
-                        ? '${timestamp.toDate().day}/${timestamp.toDate().month}/${timestamp.toDate().year}'
-                        : '';
-
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: ListTile(
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
-                          leading: CircleAvatar(
-                            radius: 20,
-                            backgroundColor: const Color(0xFF00C4B3),
-                            child: Text(
-                              trackInitial,
-                              style: const TextStyle(
-                                color: Colors.black87,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                          title: Text(
-                            displayTrack,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.black87,
-                            ),
-                          ),
-                          trailing: Text(
-                            dateStr,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                          onTap: () {
-                            // Navigate to session details
-                            print('Tapped on session: $displayTrack');
-                            Navigator.push(context, MaterialPageRoute(builder: (context) => SessionDetailsScreen(sessionId: sessionDoc.id,), ),);
-                          },
+                    child: ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor:
+                        const Color(0xFF00C4B3),
+                        child: Text(
+                          _trackInitial(trackName),
+                          style: const TextStyle(color: Colors.black),
                         ),
                       ),
-                    );
-                  },
+                      title: Text(trackName),
+                      trailing: Text(
+                        '${createdAt.day}/${createdAt.month}/${createdAt.year}',
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600]),
+                      ),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => SessionDetailsScreen(
+                              sessionId: session['id'],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
                 );
               },
             ),

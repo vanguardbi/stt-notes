@@ -56,6 +56,10 @@ dependencies:
   flutter_native_splash: ^2.4.4
   intl: ^0.20.2
   dropdown_search: ^6.0.2
+  supabase_flutter: ^2.10.3
+  sound_stream:
+    path: ./packages/sound_stream
+  web_socket_channel: ^3.0.3
 
 dev_dependencies:
   flutter_test:

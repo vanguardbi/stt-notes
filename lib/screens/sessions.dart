@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:stt/screens/session_details.dart';
 import 'package:stt/widget/custom_appbar.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SessionsScreen extends StatefulWidget {
   const SessionsScreen({Key? key}) : super(key: key);
@@ -11,9 +12,11 @@ class SessionsScreen extends StatefulWidget {
 }
 
 class _SessionsScreenState extends State<SessionsScreen> {
+  final supabase = Supabase.instance.client;
+
   String _selectedChildId = 'all';
   String _selectedChildName = 'All Clients';
-  Map<String, String> _childrenMap = {}; // Map of id -> childName
+  Map<String, String> _childrenMap = {};
   bool _isLoadingChildren = true;
 
   @override
@@ -24,18 +27,24 @@ class _SessionsScreenState extends State<SessionsScreen> {
 
   Future<void> _fetchChildren() async {
     try {
-      // Fetch all children from the children collection
-      QuerySnapshot childrenSnapshot = await FirebaseFirestore.instance
-          .collection('children')
-          .get();
+      // QuerySnapshot childrenSnapshot = await FirebaseFirestore.instance
+      //     .collection('children')
+      //     .get();
+      final response = await supabase.from('clients').select().order('First Name');
 
       Map<String, String> childrenMap = {};
-      for (var doc in childrenSnapshot.docs) {
-        var data = doc.data() as Map<String, dynamic>;
-        String childId = doc.id;
-        String childName = data['childName'] ?? 'Unknown Client';
-        childrenMap[childId] = childName;
+      for (final row in response) {
+        final String firstName = row['First Name'] ?? '';
+        final String lastName = row['Last Name'] ?? '';
+
+        childrenMap[row['ID']] = '$firstName $lastName'.trim();
       }
+      // for (var doc in childrenSnapshot.docs) {
+      //   var data = doc.data() as Map<String, dynamic>;
+      //   String childId = doc.id;
+      //   String childName = data['childName'] ?? 'Unknown Client';
+      //   childrenMap[childId] = childName;
+      // }
 
       setState(() {
         _childrenMap = childrenMap;
@@ -49,19 +58,33 @@ class _SessionsScreenState extends State<SessionsScreen> {
     }
   }
 
-  Stream<QuerySnapshot> _getSessionsStream() {
+  // Stream<QuerySnapshot> _getSessionsStream() {
+  //   if (_selectedChildId == 'all') {
+  //     return FirebaseFirestore.instance
+  //         .collection('sessions')
+  //         .orderBy('createdAt', descending: true)
+  //         .snapshots();
+  //   } else {
+  //     return FirebaseFirestore.instance
+  //         .collection('sessions')
+  //         .where('childId', isEqualTo: _selectedChildId)
+  //         .orderBy('createdAt', descending: true)
+  //         .snapshots();
+  //   }
+  // }
+  Future<List<Map<String, dynamic>>> _fetchSessions() async {
     if (_selectedChildId == 'all') {
-      return FirebaseFirestore.instance
-          .collection('sessions')
-          .orderBy('createdAt', descending: true)
-          .snapshots();
-    } else {
-      return FirebaseFirestore.instance
-          .collection('sessions')
-          .where('childId', isEqualTo: _selectedChildId)
-          .orderBy('createdAt', descending: true)
-          .snapshots();
+      return await supabase
+          .from('sessions')
+          .select('id, child_id, created_at')
+          .order('created_at', ascending: false);
     }
+
+    return await supabase
+        .from('sessions')
+        .select('id, child_id, created_at')
+        .eq('child_id', _selectedChildId)
+        .order('created_at', ascending: false);
   }
 
   String _getChildNameById(String childId) {
@@ -137,13 +160,13 @@ class _SessionsScreenState extends State<SessionsScreen> {
 
           // Sessions List
           Expanded(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: _getSessionsStream(),
+            child: FutureBuilder<List<Map<String, dynamic>>>(
+              future: _fetchSessions(),
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
                   return Center(
                     child: Text(
-                      'Error: ${snapshot.error}',
+                      'Error loading sessions',
                       style: const TextStyle(color: Colors.red),
                     ),
                   );
@@ -157,7 +180,8 @@ class _SessionsScreenState extends State<SessionsScreen> {
                   );
                 }
 
-                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                final sessions = snapshot.data ?? [];
+                if (sessions.isEmpty) {
                   return Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -192,18 +216,15 @@ class _SessionsScreenState extends State<SessionsScreen> {
 
                 return ListView.builder(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: snapshot.data!.docs.length,
+                  itemCount: sessions.length,
                   itemBuilder: (context, index) {
-                    var sessionData = snapshot.data!.docs[index].data() as Map<String, dynamic>;
-                    String childId = sessionData['childId'] ?? '';
-                    String childName = _getChildNameById(childId);
-                    Timestamp? timestamp = sessionData['createdAt'];
-                    String dateStr = '';
+                    final sessionData = sessions[index];
+                    String childId = sessionData['child_id'] ?? '';
+                    final childName = _childrenMap[childId] ?? 'Unknown Client';
+                    // Timestamp? timestamp = sessionData['created_at'];
 
-                    if (timestamp != null) {
-                      DateTime date = timestamp.toDate();
-                      dateStr = '${date.day}/${date.month}/${date.year}';
-                    }
+                    final DateTime createdAt = DateTime.parse(sessionData['created_at']);
+                    final dateStr = '${createdAt.day}/${createdAt.month}/${createdAt.year}';
 
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 12),
@@ -244,7 +265,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
                           onTap: () {
                             // Navigate to session details
                             print('Tapped on session: $childName');
-                            Navigator.push(context, MaterialPageRoute(builder: (context) => SessionDetailsScreen(sessionId: snapshot.data!.docs[index].id,), ),);
+                            Navigator.push(context, MaterialPageRoute(builder: (context) => SessionDetailsScreen(sessionId: sessionData['id'],), ),);
                           },
                         ),
                       ),

@@ -1,8 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+// import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:stt/widget/custom_button.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -15,7 +16,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isSigningIn = false;
 
   // Google Sign-In + Firebase Auth
-  Future<UserCredential?> signInWithGoogle() async {
+  Future<AuthResponse?> signInWithGoogle() async {
     try {
       setState(() => _isSigningIn = true);
 
@@ -31,36 +32,39 @@ class _LoginScreenState extends State<LoginScreen> {
       await googleUser.authentication;
 
       // Create credential
-      final credential = GoogleAuthProvider.credential(
+      // final credential = GoogleAuthProvider.credential(
+      //   accessToken: googleAuth.accessToken,
+      //   idToken: googleAuth.idToken,
+      // );
+
+      final AuthResponse response = await Supabase.instance.client.auth.signInWithIdToken(
+        provider: OAuthProvider.google,
+        idToken: googleAuth.idToken!,
         accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
       );
+      print('Auth Response: ${response}');
 
-      // Sign in to Firebase
-      final userCredential =
-      await FirebaseAuth.instance.signInWithCredential(credential);
+      if (response.user != null) {
+        final user = response.user!;
 
-      if (userCredential.user != null) {
-        final uid = userCredential.user!.uid;
-        final userDoc = FirebaseFirestore.instance.collection('users').doc(uid);
+        // We use 'upsert' here. It tries to insert.
+        // If there is a conflict (ID already exists), we can tell it to ignore.
+        // Or we can just let it update the data (like photoURL) if it changed.
 
-        // Check if user document exists
-        final docSnapshot = await userDoc.get();
-
-        if (!docSnapshot.exists) {
-          // Create new user document
-          await userDoc.set({
-            'id': uid,
-            'email': userCredential.user!.email,
-            'displayName': userCredential.user!.displayName,
-            'photoURL': userCredential.user!.photoURL,
-            'createdAt': FieldValue.serverTimestamp(),
-          });
-        }
+        await Supabase.instance.client.from('users').upsert(
+          {
+            'id': user.id,
+            'email': user.email,
+            'display_name': googleUser.displayName, // or user.userMetadata?['full_name']
+            'photo_url': googleUser.photoUrl, // or user.userMetadata?['avatar_url']
+            // 'created_at': We don't need to send this, Supabase defaults it to now()
+          },
+          // options: const FetchOptions(duplicateResolution: DuplicateResolution.ignore), // Optional: Keep old data if exists
+        );
       }
 
       setState(() => _isSigningIn = false);
-      return userCredential;
+      return response;
     } catch (e) {
       setState(() => _isSigningIn = false);
       debugPrint('Google Sign-In Error: $e');

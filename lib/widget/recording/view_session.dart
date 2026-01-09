@@ -5,7 +5,7 @@ class ViewSessionView extends StatelessWidget {
   const ViewSessionView({
     super.key,
     required this.childName,
-    required this.parentName,
+    // required this.parentName,
     required this.notes,
     this.downloadURL,
     this.transcriptText,
@@ -17,7 +17,7 @@ class ViewSessionView extends StatelessWidget {
   });
 
   final String childName;
-  final String parentName;
+  // final String parentName;
   final String notes;
   final String? downloadURL;
   final String? transcriptText;
@@ -50,18 +50,18 @@ class ViewSessionView extends StatelessWidget {
             ),
             const SizedBox(height: 20),
 
-            const Text("Parent's Name", style: TextStyle(fontSize: 14, fontWeight: FontWeight.w400)),
-            const SizedBox(height: 8),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(parentName, style: const TextStyle(fontSize: 14)),
-            ),
-            const SizedBox(height: 20),
+            // const Text("Parent's Name", style: TextStyle(fontSize: 14, fontWeight: FontWeight.w400)),
+            // const SizedBox(height: 8),
+            // Container(
+            //   width: double.infinity,
+            //   padding: const EdgeInsets.all(16),
+            //   decoration: BoxDecoration(
+            //     color: Colors.white,
+            //     borderRadius: BorderRadius.circular(8),
+            //   ),
+            //   child: Text(parentName, style: const TextStyle(fontSize: 14)),
+            // ),
+            // const SizedBox(height: 20),
 
             // Listen to Recording Button
             SizedBox(
@@ -73,18 +73,18 @@ class ViewSessionView extends StatelessWidget {
             ),
             const SizedBox(height: 20),
 
-            const Text('Objectives', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w400)),
-            const SizedBox(height: 8),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(notes.isEmpty ? 'No objectives' : notes, style: const TextStyle(fontSize: 14)),
-            ),
-            const SizedBox(height: 20),
+            // const Text('Objectives', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w400)),
+            // const SizedBox(height: 8),
+            // Container(
+            //   width: double.infinity,
+            //   padding: const EdgeInsets.all(16),
+            //   decoration: BoxDecoration(
+            //     color: Colors.white,
+            //     borderRadius: BorderRadius.circular(8),
+            //   ),
+            //   child: Text(notes.isEmpty ? 'No objectives' : notes, style: const TextStyle(fontSize: 14)),
+            // ),
+            // const SizedBox(height: 20),
 
             const Text('Transcript', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w400)),
             const SizedBox(height: 8),

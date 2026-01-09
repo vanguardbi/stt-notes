@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:stt/theme/color_scheme.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:stt/widget/auth_wrapper.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'firebase_options.dart';
 
 Future<void> main() async {
@@ -15,8 +16,12 @@ Future<void> main() async {
 
   // FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
 
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
+  // await Firebase.initializeApp(
+  //   options: DefaultFirebaseOptions.currentPlatform,
+  // );
+  await Supabase.initialize(
+    url: 'https://hcgmmdlbvocaviigphtd.supabase.co',
+    anonKey: 'sb_publishable_2NF2Adn6zyLAlf-T8BLQlQ_oeF3bocq',
   );
 
   runApp(const MyApp());

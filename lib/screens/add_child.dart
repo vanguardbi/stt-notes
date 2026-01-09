@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:stt/screens/children.dart';
 import 'package:stt/widget/custom_appbar.dart';
 import 'package:stt/widget/custom_button.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AddChildScreen extends StatefulWidget {
   const AddChildScreen({Key? key}) : super(key: key);
@@ -14,6 +15,7 @@ class AddChildScreen extends StatefulWidget {
 }
 
 class _AddChildScreenState extends State<AddChildScreen> {
+  final supabase = Supabase.instance.client;
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _childNameController = TextEditingController();
   final TextEditingController _parentNameController = TextEditingController();
@@ -53,15 +55,13 @@ class _AddChildScreenState extends State<AddChildScreen> {
 
   Future<void> _loadTracks() async {
     try {
-      QuerySnapshot snapshot = await FirebaseFirestore.instance
-          .collection('tracks')
-          .get();
+      final response = await supabase
+          .from('tracks')
+          .select('name')
+          .order('name');
 
       setState(() {
-        _availableTracks = snapshot.docs.map((doc) {
-          final data = doc.data() as Map<String, dynamic>?;
-          return data?['name'] ?? 'Unknown';
-        }).cast<String>().toList();
+        _availableTracks = response.map<String>((e) => e['name'] as String).toList();
       });
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -76,23 +76,32 @@ class _AddChildScreenState extends State<AddChildScreen> {
         _isSaving = true;
       });
 
-      final user = FirebaseAuth.instance.currentUser;
+      final user = supabase.auth.currentUser;
 
       if (user == null) {
         throw Exception('No user logged in');
       }
 
       try {
-        final docRef = FirebaseFirestore.instance.collection('children').doc();
-        await docRef.set({
-          'id': docRef.id,
-          'childName': _childNameController.text.trim(),
-          'parentName': _parentNameController.text.trim(),
-          'dateOfBirth': _dobController.text.trim(),
-          'tracks': _selectedTracks,
+        // final docRef = FirebaseFirestore.instance.collection('clients').doc();
+        // await docRef.set({
+        //   'id': docRef.id,
+        //   'childName': _childNameController.text.trim(),
+        //   'parentName': _parentNameController.text.trim(),
+        //   'dateOfBirth': _dobController.text.trim(),
+        //   'tracks': _selectedTracks,
+        //   'notes': _notesController.text.trim(),
+        //   'createdBy': user.uid,
+        //   'createdAt': FieldValue.serverTimestamp(),
+        // });
+        await supabase.from('clients').insert({
+          'created_by': user.id,
+          'child_name': _childNameController.text.trim(),
+          'parent_name': _parentNameController.text.trim(),
           'notes': _notesController.text.trim(),
-          'createdBy': user.uid,
-          'createdAt': FieldValue.serverTimestamp(),
+          'date_of_birth': _dobController.text.trim(),
+          'tracks': _selectedTracks,
+          'created_at': DateTime.now().toIso8601String(),
         });
 
         if (!mounted) return;
