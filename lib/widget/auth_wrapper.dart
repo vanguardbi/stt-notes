@@ -1,33 +1,38 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:stt/main.dart';
 import 'package:stt/screens/login.dart';
 
-/// This widget listens to authentication state changes
-/// and shows LoginScreen or MainPage accordingly
-class AuthWrapper extends StatelessWidget {
+class AuthWrapper extends StatefulWidget {
   const AuthWrapper({super.key});
 
   @override
+  State<AuthWrapper> createState() => _AuthWrapperState();
+}
+
+class _AuthWrapperState extends State<AuthWrapper> {
+  final supabase = Supabase.instance.client;
+
+  @override
   Widget build(BuildContext context) {
-    return StreamBuilder<User?>(
-      stream: FirebaseAuth.instance.authStateChanges(),
+    return StreamBuilder<AuthState>(
+      stream: supabase.auth.onAuthStateChange,
       builder: (context, snapshot) {
-        // Show loading indicator while checking auth state
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        // Still loading auth state
+        if (!snapshot.hasData) {
           return const Scaffold(
-            body: Center(
-              child: CircularProgressIndicator(),
-            ),
+            body: Center(child: CircularProgressIndicator()),
           );
         }
 
-        // If user is logged in, show MainPage
-        if (snapshot.hasData && snapshot.data != null) {
+        final session = snapshot.data?.session;
+
+        // User is logged in
+        if (session != null && session.user != null) {
           return const MainPage();
         }
 
-        // If user is not logged in, show LoginScreen
+        // User is logged out
         return const LoginScreen();
       },
     );

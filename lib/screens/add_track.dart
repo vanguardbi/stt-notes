@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:stt/screens/add_session.dart';
 import 'package:stt/utils/utils.dart';
 import 'package:stt/widget/custom_appbar.dart';
 import 'package:stt/widget/custom_button.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AddTrackScreen extends StatefulWidget {
   final List<String> existingTracks;
@@ -20,6 +20,7 @@ class AddTrackScreen extends StatefulWidget {
 }
 
 class _AddTrackScreenState extends State<AddTrackScreen> {
+  final supabase = Supabase.instance.client;
   final _formKey = GlobalKey<FormState>();
   final List<TextEditingController> _objectiveControllers = [];
 
@@ -47,19 +48,18 @@ class _AddTrackScreenState extends State<AddTrackScreen> {
 
   Future<void> _loadTracks() async {
     try {
-      QuerySnapshot snapshot = await FirebaseFirestore.instance
-          .collection('tracks')
-          .get();
+      final response = await supabase
+          .from('tracks')
+          .select('name')
+          .order('name');
+
+      final allTracks =
+      response.map<String>((e) => e['name'] as String).toList();
 
       setState(() {
-        _tracks = snapshot.docs.map((doc) {
-          final data = doc.data() as Map<String, dynamic>?;
-          return data?['name'] ?? 'Unknown';
-        }).cast<String>().toList();
-
-        // Filter out already selected tracks (except current one if editing)
-        _tracks = _tracks.where((track) {
-          if (widget.initialTrack != null && track == widget.initialTrack!.trackName) {
+        _tracks = allTracks.where((track) {
+          if (widget.initialTrack != null &&
+              track == widget.initialTrack!.trackName) {
             return true;
           }
           return !widget.existingTracks.contains(track);

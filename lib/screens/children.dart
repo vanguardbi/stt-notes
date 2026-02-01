@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:stt/screens/add_child.dart';
 import 'package:stt/screens/child_details.dart';
 import 'package:stt/screens/sessions.dart';
@@ -14,6 +14,7 @@ class ChildrenListScreen extends StatefulWidget {
 }
 
 class _ChildrenListScreenState extends State<ChildrenListScreen> {
+  final supabase = Supabase.instance.client;
   String _searchQuery = '';
 
   @override
@@ -23,15 +24,16 @@ class _ChildrenListScreenState extends State<ChildrenListScreen> {
       appBar: CustomAppBar(
         title: 'Clients',
         showBack: true,
-        actions: [
-        IconButton(
-          icon: const Icon(Icons.add, color: Colors.white, size: 30),
-          onPressed: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const AddChildScreen()),
-          ),
-        )
-      ],),
+        // actions: [
+        //   IconButton(
+        //     icon: const Icon(Icons.add, color: Colors.white, size: 30),
+        //     onPressed: () => Navigator.push(
+        //       context,
+        //       MaterialPageRoute(builder: (_) => const AddChildScreen()),
+        //     ),
+        //   )
+        // ],
+      ),
       body: Column(
         children: [
           // Search Bar
@@ -43,9 +45,7 @@ class _ChildrenListScreenState extends State<ChildrenListScreen> {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: TextField(
-                style: const TextStyle(
-                  fontSize: 14,
-                ),
+                style: const TextStyle(fontSize: 14),
                 cursorColor: Colors.black,
                 onChanged: (value) {
                   setState(() {
@@ -76,84 +76,56 @@ class _ChildrenListScreenState extends State<ChildrenListScreen> {
             ),
           ),
 
-          // Children List
+          // Children List Stream
           Expanded(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('children')
-                  .orderBy('createdAt', descending: true)
-                  .snapshots(),
+            child: StreamBuilder<List<Map<String, dynamic>>>(
+              stream: supabase
+                  .from('clients')
+                  .stream(primaryKey: ['ID'])
+                  .order('created_at', ascending: false),
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
                   return Center(
-                    child: Text(
-                      'Error: ${snapshot.error}',
-                      style: const TextStyle(color: Colors.red),
-                    ),
+                    child: Text('Error: ${snapshot.error}',
+                        style: const TextStyle(color: Colors.red)),
                   );
                 }
 
-                if (snapshot.connectionState == ConnectionState.waiting) {
+                if (!snapshot.hasData) {
                   return const Center(
                     child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.black54),
+                      valueColor:
+                      AlwaysStoppedAnimation<Color>(Colors.black54),
                     ),
                   );
                 }
 
-                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.child_care,
-                          size: 64,
-                          color: Colors.grey[400],
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No children added yet',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
-                    ),
+                final children = snapshot.data!;
+
+                if (children.isEmpty) {
+                  return _emptyState(
+                    icon: Icons.child_care,
+                    message: 'No clients added yet',
                   );
                 }
 
-                // Filter the documents based on search query (client-side filtering)
+                // Client-side search filtering
                 final filteredDocs = _searchQuery.isEmpty
-                    ? snapshot.data!.docs
-                    : snapshot.data!.docs.where((doc) {
-                  var childData = doc.data() as Map<String, dynamic>;
-                  String childName = (childData['childName'] ?? '').toString().toLowerCase();
-                  return childName.contains(_searchQuery);
+                    ? children
+                    : children.where((c) {
+                  final String firstName = c['First Name'] ?? '';
+                  final String lastName = c['Last Name'] ?? '';
+                  final childName = '$firstName $lastName'.trim() ?? '';
+                  final name = (childName ?? '')
+                      .toString()
+                      .toLowerCase();
+                  return name.contains(_searchQuery);
                 }).toList();
 
-                // Show message if no results found after filtering
                 if (filteredDocs.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.search_off,
-                          size: 64,
-                          color: Colors.grey[400],
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No children found',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
-                    ),
+                  return _emptyState(
+                    icon: Icons.search_off,
+                    message: 'No clients found',
                   );
                 }
 
@@ -161,15 +133,19 @@ class _ChildrenListScreenState extends State<ChildrenListScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   itemCount: filteredDocs.length,
                   itemBuilder: (context, index) {
-                    var childData = filteredDocs[index].data() as Map<String, dynamic>;
-                    String childName = childData['childName'] ?? '';
-                    Timestamp? timestamp = childData['createdAt'];
-                    String dateStr = '';
+                    final childData = filteredDocs[index];
+                    final String firstName = childData['First Name'] ?? '';
+                    final String lastName = childData['Last Name'] ?? '';
+                    final childName = '$firstName $lastName'.trim() ?? '';
 
-                    if (timestamp != null) {
-                      DateTime date = timestamp.toDate();
-                      dateStr = '${date.day}/${date.month}/${date.year}';
+                    DateTime? createdAt;
+                    if (childData['created_at'] != null) {
+                      createdAt = DateTime.tryParse(childData['created_at']);
                     }
+
+                    final dateStr = createdAt == null
+                        ? ''
+                        : '${createdAt.day}/${createdAt.month}/${createdAt.year}';
 
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 12),
@@ -187,7 +163,9 @@ class _ChildrenListScreenState extends State<ChildrenListScreen> {
                             radius: 20,
                             backgroundColor: const Color(0xFF00C4B3),
                             child: Text(
-                              childName.isNotEmpty ? childName[0].toUpperCase() : 'C',
+                              childName.isNotEmpty
+                                  ? childName[0].toUpperCase()
+                                  : 'C',
                               style: const TextStyle(
                                 color: Colors.black87,
                                 fontSize: 16,
@@ -211,12 +189,11 @@ class _ChildrenListScreenState extends State<ChildrenListScreen> {
                             ),
                           ),
                           onTap: () {
-                            // Navigate to child details screen
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => ChildDetailsScreen(
-                                  childId: filteredDocs[index].id,
+                                builder: (_) => ChildDetailsScreen(
+                                  childId: childData['ID'],
                                   childName: childName,
                                 ),
                               ),
@@ -231,7 +208,7 @@ class _ChildrenListScreenState extends State<ChildrenListScreen> {
             ),
           ),
 
-          // Save All Sessions Button
+          // All Sessions Button
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: SizedBox(
@@ -239,10 +216,30 @@ class _ChildrenListScreenState extends State<ChildrenListScreen> {
               child: CustomButton(
                 text: 'See All Sessions',
                 onPressed: () {
-                  Navigator.push(context, MaterialPageRoute(builder: (context) => const SessionsScreen()));
-                }
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const SessionsScreen()),
+                  );
+                },
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _emptyState({required IconData icon, required String message}) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 64, color: Colors.grey[400]),
+          const SizedBox(height: 16),
+          Text(
+            message,
+            style: TextStyle(fontSize: 16, color: Colors.grey[600]),
           ),
         ],
       ),

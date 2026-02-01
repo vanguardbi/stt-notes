@@ -6,6 +6,7 @@ import 'package:stt/screens/recording.dart';
 import 'package:stt/utils/utils.dart';
 import 'package:stt/widget/custom_appbar.dart';
 import 'package:stt/widget/custom_button.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AddSessionScreen extends StatefulWidget {
   const AddSessionScreen({Key? key}) : super(key: key);
@@ -17,6 +18,8 @@ class AddSessionScreen extends StatefulWidget {
 class _AddSessionScreenState extends State<AddSessionScreen> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _parentNameController = TextEditingController();
+
+  final supabase = Supabase.instance.client;
 
   String? _selectedChildId;
   String? _selectedChildName;
@@ -33,26 +36,32 @@ class _AddSessionScreenState extends State<AddSessionScreen> {
 
   Future<void> _loadChildren() async {
     try {
-      QuerySnapshot snapshot = await FirebaseFirestore.instance
-          .collection('children')
-          .orderBy('childName')
-          .get();
+      final response = await supabase
+          .from('clients')
+          .select()
+          .order('child_name');
 
       setState(() {
-        _children = snapshot.docs.map((doc) {
-          final data = doc.data() as Map<String, dynamic>? ?? {};
+        _children = response.map<Map<String, dynamic>>((row) {
+          final String firstName = row['First Name'] ?? '';
+          final String lastName = row['Last Name'] ?? '';
+
           return {
-            'id': doc.id,
-            'name': data['childName'] ?? '',
-            'parentName': data['parentName'] ?? '',
+            'id': row['ID'].toString(),
+            // 'name': row['child_name'] ?? '',
+            'name': '$firstName $lastName'.trim(),
+            // 'parentName': row['parent_name'] ?? '',
+            // 'parentName': '$firstName $lastName'.trim(),
           };
         }).toList();
+
         _isLoadingChildren = false;
       });
     } catch (e) {
       setState(() {
         _isLoadingChildren = false;
       });
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -75,9 +84,7 @@ class _AddSessionScreenState extends State<AddSessionScreen> {
     );
 
     if (result != null) {
-      setState(() {
-        _selectedTracks.add(result);
-      });
+      setState(() => _selectedTracks.add(result));
     }
   }
 
@@ -99,16 +106,12 @@ class _AddSessionScreenState extends State<AddSessionScreen> {
     );
 
     if (result != null) {
-      setState(() {
-        _selectedTracks[index] = result;
-      });
+      setState(() => _selectedTracks[index] = result);
     }
   }
 
   void _removeTrack(int index) {
-    setState(() {
-      _selectedTracks.removeAt(index);
-    });
+    setState(() => _selectedTracks.removeAt(index));
   }
 
   void _startSession() async {
@@ -122,16 +125,14 @@ class _AddSessionScreenState extends State<AddSessionScreen> {
         );
         return;
       }
-      print(_selectedTracks.map((t) => t.toMap()).toList());
 
-      // Navigate to recording screen with session details
       Navigator.push(
         context,
         MaterialPageRoute(
           builder: (context) => RecordingSessionScreen(
             childId: _selectedChildId!,
             childName: _selectedChildName!,
-            parentName: _parentNameController.text.trim(),
+            // parentName: _parentNameController.text.trim(),
             tracks: _selectedTracks,
           ),
         ),
@@ -260,7 +261,7 @@ class _AddSessionScreenState extends State<AddSessionScreen> {
                           _selectedChildId = value;
                           final selectedChild = _children.firstWhere((child) => child['id'] == value);
                           _selectedChildName = selectedChild['name'];
-                          _parentNameController.text = selectedChild['parentName'] ?? '';
+                          // _parentNameController.text = selectedChild['parentName'] ?? '';
                         });
                       }
                     },
@@ -275,55 +276,55 @@ class _AddSessionScreenState extends State<AddSessionScreen> {
                 const SizedBox(height: 20),
 
                 // Parent's Name
-                const Text(
-                  "Parent's Name",
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w400,
-                    color: Colors.black87,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: TextFormField(
-                    controller: _parentNameController,
-                    readOnly: true,
-                    style: const TextStyle(
-                      fontSize: 14,
-                    ),
-                    cursorColor: Colors.black,
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Please enter parent\'s name';
-                      }
-                      return null;
-                    },
-                    decoration: InputDecoration(
-                      hintText: 'George Osieko',
-                      hintStyle: TextStyle(
-                        color: Colors.grey[400],
-                        fontSize: 14,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide.none,
-                      ),
-                      errorBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: Colors.red, width: 1),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 14,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
+                // const Text(
+                //   "Parent's Name",
+                //   style: TextStyle(
+                //     fontSize: 14,
+                //     fontWeight: FontWeight.w400,
+                //     color: Colors.black87,
+                //   ),
+                // ),
+                // const SizedBox(height: 8),
+                // Container(
+                //   decoration: BoxDecoration(
+                //     color: Colors.white,
+                //     borderRadius: BorderRadius.circular(8),
+                //   ),
+                //   child: TextFormField(
+                //     controller: _parentNameController,
+                //     // readOnly: true,
+                //     style: const TextStyle(
+                //       fontSize: 14,
+                //     ),
+                //     cursorColor: Colors.black,
+                //     validator: (value) {
+                //       if (value == null || value.trim().isEmpty) {
+                //         return 'Please enter parent\'s name';
+                //       }
+                //       return null;
+                //     },
+                //     decoration: InputDecoration(
+                //       hintText: 'George Osieko',
+                //       hintStyle: TextStyle(
+                //         color: Colors.grey[400],
+                //         fontSize: 14,
+                //       ),
+                //       border: OutlineInputBorder(
+                //         borderRadius: BorderRadius.circular(8),
+                //         borderSide: BorderSide.none,
+                //       ),
+                //       errorBorder: OutlineInputBorder(
+                //         borderRadius: BorderRadius.circular(8),
+                //         borderSide: const BorderSide(color: Colors.red, width: 1),
+                //       ),
+                //       contentPadding: const EdgeInsets.symmetric(
+                //         horizontal: 16,
+                //         vertical: 14,
+                //       ),
+                //     ),
+                //   ),
+                // ),
+                // const SizedBox(height: 20),
 
                 // Tracks Section
                 Row(

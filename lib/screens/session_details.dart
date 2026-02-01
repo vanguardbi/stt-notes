@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_sound/flutter_sound.dart';
+import 'package:intl/intl.dart';
 import 'package:stt/widget/custom_appbar.dart';
 import 'package:stt/widget/custom_button.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class SessionDetailsScreen extends StatefulWidget {
@@ -18,6 +20,7 @@ class SessionDetailsScreen extends StatefulWidget {
 }
 
 class _SessionDetailsScreenState extends State<SessionDetailsScreen> {
+  final _supabase = Supabase.instance.client;
   final FlutterSoundPlayer _audioPlayer = FlutterSoundPlayer();
   bool _isPlayerInitialized = false;
   bool _isPlaying = false;
@@ -46,32 +49,25 @@ class _SessionDetailsScreenState extends State<SessionDetailsScreen> {
 
   Future<void> _fetchSessionData() async {
     try {
-      // Fetch session data
-      DocumentSnapshot sessionDoc = await FirebaseFirestore.instance
-          .collection('sessions')
-          .doc(widget.sessionId)
-          .get();
+      final sessionData = await _supabase
+          .from('sessions')
+          .select()
+          .eq('id', widget.sessionId)
+          .single();
 
-      if (!sessionDoc.exists) {
-        throw Exception('Session not found');
-      }
-
-      Map<String, dynamic> sessionData = sessionDoc.data() as Map<String, dynamic>;
-
-      // Fetch child name using childId
-      String childId = sessionData['childId'] ?? '';
       String childName = 'Unknown Client';
+      final String? childId = sessionData['child_id'];
 
-      if (childId.isNotEmpty) {
-        DocumentSnapshot childDoc = await FirebaseFirestore.instance
-            .collection('children')
-            .doc(childId)
-            .get();
+      if (childId != null && childId.isNotEmpty) {
+        final childData = await _supabase
+            .from('clients')
+            .select()
+            .eq('ID', childId)
+            .single();
 
-        if (childDoc.exists) {
-          Map<String, dynamic> childData = childDoc.data() as Map<String, dynamic>;
-          childName = childData['childName'] ?? 'Unknown Client';
-        }
+        final String firstName = childData['First Name'] ?? '';
+        final String lastName = childData['Last Name'] ?? '';
+        childName = '$firstName $lastName'.trim() ?? 'Unknown Client';
       }
 
       setState(() {
@@ -98,7 +94,7 @@ class _SessionDetailsScreenState extends State<SessionDetailsScreen> {
   Future<void> _playAudio() async {
     if (_sessionData == null || !_isPlayerInitialized) return;
 
-    String? audioUrl = _sessionData!['audioUrl'];
+    String? audioUrl = _sessionData!['audio_url'];
     if (audioUrl == null || audioUrl.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -139,7 +135,7 @@ class _SessionDetailsScreenState extends State<SessionDetailsScreen> {
   }
 
   Future<void> _openTranscriptUrl() async {
-    if (_sessionData!['url'] == null || _sessionData!['url']!.isEmpty) {
+    if (_sessionData!['doc_url'] == null || _sessionData!['doc_url']!.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Transcript URL not available'),
@@ -150,7 +146,7 @@ class _SessionDetailsScreenState extends State<SessionDetailsScreen> {
     }
 
     try {
-      final Uri url = Uri.parse(_sessionData!['url']!);
+      final Uri url = Uri.parse(_sessionData!['doc_url']!);
       // if (await canLaunchUrl(url)) {
         await launchUrl(url, mode: LaunchMode.externalApplication);
       // } else {
@@ -173,10 +169,10 @@ class _SessionDetailsScreenState extends State<SessionDetailsScreen> {
     super.dispose();
   }
 
-  String _formatDate(Timestamp? timestamp) {
-    if (timestamp == null) return 'N/A';
-    DateTime date = timestamp.toDate();
-    return '${date.day}/${date.month}/${date.year}';
+  String _formatDate(String? dateString) {
+    if (dateString == null) return 'N/A';
+    DateTime date = DateTime.parse(dateString).toLocal();
+    return DateFormat('dd/MM/yyyy').format(date);
   }
 
   String _formatDuration(int? seconds) {
@@ -253,7 +249,7 @@ class _SessionDetailsScreenState extends State<SessionDetailsScreen> {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  _sessionData!['parentName'] ?? 'N/A',
+                  _sessionData!['parent_name'] ?? 'N/A',
                   style: const TextStyle(fontSize: 14),
                 ),
               ),
@@ -349,7 +345,7 @@ class _SessionDetailsScreenState extends State<SessionDetailsScreen> {
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
-                            _formatDate(_sessionData!['createdAt']),
+                            _formatDate(_sessionData!['created_at']),
                             style: const TextStyle(fontSize: 14),
                           ),
                         ),
@@ -414,9 +410,9 @@ class _SessionDetailsScreenState extends State<SessionDetailsScreen> {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  _sessionData!['formattedConversation']?.isEmpty ?? true
+                  _sessionData!['formatted_conversation']?.isEmpty ?? true
                       ? 'No transcript available'
-                      : _sessionData!['formattedConversation'],
+                      : _sessionData!['formatted_conversation'],
                   style: const TextStyle(fontSize: 14),
                 ),
               ),
@@ -452,9 +448,9 @@ class _SessionDetailsScreenState extends State<SessionDetailsScreen> {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  _sessionData!['nextSessionPlans']?.isEmpty ?? true
+                  _sessionData!['next_session_plans']?.isEmpty ?? true
                       ? 'No plans recorded'
-                      : _sessionData!['nextSessionPlans'],
+                      : _sessionData!['next_session_plans'],
                   style: const TextStyle(fontSize: 14),
                 ),
               ),
@@ -466,7 +462,7 @@ class _SessionDetailsScreenState extends State<SessionDetailsScreen> {
                 width: double.infinity,
                 child: CustomButton(
                   text: 'View Summary in Google Docs',
-                  onPressed: _sessionData!['url'] != null && _sessionData!['url']!.isNotEmpty
+                  onPressed: _sessionData!['doc_url'] != null && _sessionData!['doc_url']!.isNotEmpty
                       ? _openTranscriptUrl
                       : null,
                 ),
