@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:sound_stream/sound_stream.dart';
 import 'package:stt/utils/utils.dart';
@@ -43,23 +43,24 @@ class RecordingSessionScreen extends StatefulWidget {
 }
 
 class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
-  late FlutterSoundPlayer _audioPlayer;
+  final RecorderStream _pcmRecorder = RecorderStream();
+  final FlutterSoundRecorder _fileRecorder = FlutterSoundRecorder();
+  final FlutterSoundPlayer _audioPlayer = FlutterSoundPlayer();
   final StopWatchTimer _stopWatchTimer = StopWatchTimer();
 
-  final RecorderStream _recorder = RecorderStream();
   StreamSubscription? _audioSubscription;
 
   IOWebSocketChannel? _deepgramChannel;
-  IOSink? _fileSink;
 
   final _supabase = Supabase.instance.client;
 
   final int _sampleRate = 16000;
-  final String _fileExtension = 'wav';
-  final String _deepgramApiKey = '';
+  final String _fileExtension = 'm4a';
+  final String _deepgramApiKey = String.fromEnvironment('DEEPGRAM_API_KEY');
 
   final TextEditingController _outcomesController = TextEditingController();
   final TextEditingController _plansController = TextEditingController();
+  final TextEditingController _notesController = TextEditingController();
 
   // Recording stages
   RecordingStage _currentStage = RecordingStage.initial;
@@ -75,6 +76,7 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
   int _recordingDuration = 0;
   bool _isGeneratingTranscript = false;
   bool _isSavingSession = false;
+  bool _isCurrentlyRecording = false;
 
   @override
   void initState() {
@@ -83,29 +85,27 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
   }
 
   Future<void> _initializeRecorder() async {
-    _audioPlayer = FlutterSoundPlayer();
-
     await Permission.microphone.request();
+    await _pcmRecorder.initialize();
+    await _fileRecorder.openRecorder();
     await _audioPlayer.openPlayer();
-
-    await _recorder.initialize();
     print('Recorder initialized');
   }
 
   @override
   void dispose() async {
-    _audioSubscription?.cancel();
-    _deepgramChannel?.sink.close();
-    _stopWatchTimer.dispose();
-    _fileSink?.close();
     _cleanupResources();
     super.dispose();
   }
 
   Future<void> _cleanupResources() async {
     try {
-      await _recorder.stop();
-      await _audioPlayer.closePlayer();
+      _audioSubscription?.cancel();
+      _deepgramChannel?.sink.close();
+      _pcmRecorder.stop();
+      _fileRecorder.closeRecorder();
+      _audioPlayer.closePlayer();
+      _stopWatchTimer.dispose();
       await _cleanupTempFiles();
     } catch (e) {
       print('Error during resource cleanup: $e');
@@ -149,12 +149,17 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
 
       // 1. Prepare File
       String filePath = '${appDir.path}/recording_${DateTime.now().millisecondsSinceEpoch}.$_fileExtension';
-      File file = File(filePath);
-      if (file.existsSync()) await file.delete();
-      _fileSink = file.openWrite(); // Open stream to write bytes
+
+      await _fileRecorder.startRecorder(
+        toFile: filePath,
+        codec: Codec.aacMP4,
+        sampleRate: _sampleRate,
+        numChannels: 1,
+        bitRate: 32000,
+      );
 
       // 2. Connect to Deepgram
-      final deepgramUrl = Uri.parse('wss://api.deepgram.com/v1/listen?encoding=linear16&sample_rate=$_sampleRate&language=en&smart_format=true');
+      final deepgramUrl = Uri.parse('wss://api.deepgram.com/v1/listen?model=nova-2&encoding=linear16&sample_rate=$_sampleRate&language=en&smart_format=true');
       _deepgramChannel = IOWebSocketChannel.connect(
         deepgramUrl,
         headers: {'Authorization': 'Token $_deepgramApiKey'},
@@ -166,14 +171,11 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
       }, onError: (e) => print('Deepgram error: $e'));
 
       // 4. Start Mic Stream & Split Data
-      _audioSubscription = _recorder.audioStream.listen((data) {
+      _audioSubscription = _pcmRecorder.audioStream.listen((data) {
         // A. Send to Deepgram
         _deepgramChannel?.sink.add(data);
-        // B. Write to Local File
-        _fileSink?.add(data);
       });
-
-      await _recorder.start();
+      await _pcmRecorder.start();
 
       // UI Updates
       await Future.delayed(const Duration(milliseconds: 500));
@@ -184,6 +186,7 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
       setState(() {
         _currentStage = RecordingStage.recording;
         _recordedFilePath = filePath;
+        _isCurrentlyRecording = true;
         _transcriptText = ""; // Reset transcript
       });
     } catch (e) {
@@ -216,10 +219,11 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
 
   void pauseRecording() async {
     try {
-      await _recorder.stop();
+      await _pcmRecorder.stop();
+      await _fileRecorder.pauseRecorder();
       _stopWatchTimer.onStopTimer();
       await WakelockPlus.disable();
-      setState(() {});
+      setState(() { _isCurrentlyRecording = false; });
     } catch (e) {
       print('Error pausing recording: $e');
     }
@@ -227,10 +231,11 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
 
   void resumeRecording() async {
     try {
-      await _recorder.start();
+      await _pcmRecorder.start();
+      await _fileRecorder.resumeRecorder();
       _stopWatchTimer.onStartTimer();
       await WakelockPlus.enable();
-      setState(() {});
+      setState(() { _isCurrentlyRecording = true; });
     } catch (e) {
       print('Error resuming recording: $e');
     }
@@ -238,21 +243,14 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
 
   void stopRecording() async {
     try {
-      await _recorder.stop();
       await _audioSubscription?.cancel();
+      await _pcmRecorder.stop();
       _audioSubscription = null;
 
       _deepgramChannel?.sink.add(jsonEncode({'type': 'CloseStream'}));
       await _deepgramChannel?.sink.close();
+      await _fileRecorder.stopRecorder();
       _deepgramChannel = null;
-
-      await _fileSink?.flush();
-      await _fileSink?.close();
-      _fileSink = null;
-
-      if (_recordedFilePath != null) {
-        await _addWavHeader(_recordedFilePath!);
-      }
 
       bool? canVibrate = await Vibration.hasVibrator();
       if (canVibrate == true) Vibration.vibrate(duration: 100);
@@ -261,6 +259,7 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
       await WakelockPlus.disable();
 
       setState(() {
+        _isCurrentlyRecording = false;
         _currentStage = RecordingStage.recordingComplete;
       });
 
@@ -271,54 +270,6 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
         SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
       );
     }
-  }
-
-  Future<void> _addWavHeader(String path) async {
-    final file = File(path);
-    if (!await file.exists()) return;
-
-    final pcmBytes = await file.readAsBytes();
-    final header = _buildWavHeader(pcmBytes.length, _sampleRate);
-
-    final bytesBuilder = BytesBuilder();
-    bytesBuilder.add(header);
-    bytesBuilder.add(pcmBytes);
-
-    await file.writeAsBytes(bytesBuilder.toBytes(), flush: true);
-    print("WAV Header added. Ready for upload.");
-  }
-
-  Uint8List _buildWavHeader(int dataLength, int sampleRate) {
-    int channels = 1;
-    int bitsPerSample = 16;
-    int byteRate = sampleRate * channels * (bitsPerSample ~/ 8);
-    int blockAlign = channels * (bitsPerSample ~/ 8);
-    int fileSize = dataLength + 36;
-
-    final header = BytesBuilder();
-    header.add("RIFF".codeUnits);
-    header.add(_intToBytes(fileSize, 4));
-    header.add("WAVE".codeUnits);
-    header.add("fmt ".codeUnits);
-    header.add(_intToBytes(16, 4));
-    header.add(_intToBytes(1, 2));
-    header.add(_intToBytes(channels, 2));
-    header.add(_intToBytes(sampleRate, 4));
-    header.add(_intToBytes(byteRate, 4));
-    header.add(_intToBytes(blockAlign, 2));
-    header.add(_intToBytes(bitsPerSample, 2));
-    header.add("data".codeUnits);
-    header.add(_intToBytes(dataLength, 4));
-    return header.toBytes();
-  }
-
-  List<int> _intToBytes(int value, int length) {
-    final ret = <int>[];
-    for (var i = 0; i < length; i++) {
-      ret.add(value & 0xFF);
-      value >>= 8;
-    }
-    return ret;
   }
 
   Future<void> _saveSessionToFirestore() async {
@@ -334,27 +285,14 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
         throw Exception('Please login first');
       }
 
-      final fileName = '${widget.childId}_${DateTime.now().millisecondsSinceEpoch}.$_fileExtension';
-      final storagePath = 'uploads/$fileName';
-
-      print('Uploading file to Supabase Storage...');
+      print('Uploading file to Firebase Storage...');
 
       final file = File(_recordedFilePath!);
 
-      await _supabase.storage
-          .from('session_recordings')
-          .upload(
-        storagePath,
-        file,
-        fileOptions: const FileOptions(cacheControl: '3600', upsert: false),
-      );
-
-      final String publicUrl = _supabase.storage
-          .from('session_recordings')
-          .getPublicUrl(storagePath);
-
-      print('File uploaded: $publicUrl');
-      _downloadURL = publicUrl;
+      final storageRef = FirebaseStorage.instance.ref()
+          .child('recordings/${widget.childId}_${DateTime.now().millisecondsSinceEpoch}.$_fileExtension');
+      final uploadTask = await storageRef.putFile(File(_recordedFilePath!));
+      _downloadURL = await uploadTask.ref.getDownloadURL();
 
       final tracksData = widget.tracks.map((track) => track.toMap()).toList();
 
@@ -366,6 +304,7 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
         'audio_url': _downloadURL,
         'duration': _recordingDuration ~/ 1000,
         'transcript': _transcriptText,
+        'notes': _notesController.text.trim(),
         'created_by': user.id,
         'created_at': DateTime.now().toIso8601String(),
       }).select().single();
@@ -451,6 +390,7 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
           'name': widget.childName,
           'tracks': tracksData,
           'nextSessionPlans': plans,
+          'sessionNotes': _notesController.text.trim()
         }),
       );
 
@@ -458,8 +398,9 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
 
       // Check if success is true
       if (result['success'] != true) {
+        print('Error gt checking');
         setState(() {
-          _currentStage = RecordingStage.recordingComplete;
+          _currentStage = RecordingStage.detailsUpdate;
           _isGeneratingTranscript = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
@@ -490,13 +431,13 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
 
       setState(() {
         _isGeneratingTranscript = false;
-        _currentStage = RecordingStage.recordingComplete;
+        _currentStage = RecordingStage.detailsUpdate;
       });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: $e'),
+            content: Text('Error generating transcript'),
             backgroundColor: Colors.red,
             duration: const Duration(seconds: 5),
           ),
@@ -535,13 +476,6 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
     final plans = _plansController.text.trim();
 
     try {
-      // await FirebaseFirestore.instance.collection("sessions").doc(_sessionId)
-      //     .update({
-      //   "outcomes": outcomes,
-      //   "nextSessionPlans": plans,
-      //   "updatedAt": FieldValue.serverTimestamp(),
-      // });
-
       await _supabase.from('sessions').update({
         'outcomes': outcomes,
         'next_session_plans': plans,
@@ -623,24 +557,24 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
 
   // Stage 2: Recording View
   Widget _buildRecordingView() {
-    final isRecording = _currentStage == RecordingStage.recording;
 
     return RecordingView(
-      isRecording: isRecording,
-      stopWatchTimer: _stopWatchTimer,
-      pauseRecording: pauseRecording,
-      resumeRecording: resumeRecording,
-      stopRecording: stopRecording
+        isRecording: _isCurrentlyRecording,
+        stopWatchTimer: _stopWatchTimer,
+        pauseRecording: pauseRecording,
+        resumeRecording: resumeRecording,
+        stopRecording: stopRecording,
+        notesController: _notesController
     );
   }
 
   // Stage 3: Recording Complete View
   Widget _buildRecordingCompleteView() {
     return RecordingCompleteView(
-      childName: widget.childName,
-      recordingDuration: _recordingDuration,
-      isSavingSession: _isSavingSession,
-      onUpdateOutcomes: () { setState(() { _currentStage = RecordingStage.detailsUpdate; }); }
+        childName: widget.childName,
+        recordingDuration: _recordingDuration,
+        isSavingSession: _isSavingSession,
+        onUpdateOutcomes: () { setState(() { _currentStage = RecordingStage.detailsUpdate; }); }
     );
   }
 

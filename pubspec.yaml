@@ -60,6 +60,7 @@ dependencies:
   sound_stream:
     path: ./packages/sound_stream
   web_socket_channel: ^3.0.3
+  record: ^6.1.2
 
 dev_dependencies:
   flutter_test:
