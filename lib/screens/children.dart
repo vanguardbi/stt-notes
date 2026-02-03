@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:stt/screens/add_child.dart';
 import 'package:stt/screens/child_details.dart';
 import 'package:stt/screens/sessions.dart';
 import 'package:stt/widget/custom_appbar.dart';
@@ -24,15 +23,6 @@ class _ChildrenListScreenState extends State<ChildrenListScreen> {
       appBar: CustomAppBar(
         title: 'Clients',
         showBack: true,
-        // actions: [
-        //   IconButton(
-        //     icon: const Icon(Icons.add, color: Colors.white, size: 30),
-        //     onPressed: () => Navigator.push(
-        //       context,
-        //       MaterialPageRoute(builder: (_) => const AddChildScreen()),
-        //     ),
-        //   )
-        // ],
       ),
       body: Column(
         children: [

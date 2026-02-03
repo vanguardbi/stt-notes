@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:stt/screens/session_details.dart';
 import 'package:stt/widget/custom_appbar.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -13,268 +12,247 @@ class SessionsScreen extends StatefulWidget {
 
 class _SessionsScreenState extends State<SessionsScreen> {
   final supabase = Supabase.instance.client;
-
-  String _selectedChildId = 'all';
-  String _selectedChildName = 'All Clients';
+  final TextEditingController _searchController = TextEditingController();
   Map<String, String> _childrenMap = {};
-  bool _isLoadingChildren = true;
+  bool _isChildrenLoading = true;
+  String _searchQuery = '';
+
+  late Stream<List<Map<String, dynamic>>> _sessionsStream;
 
   @override
   void initState() {
     super.initState();
     _fetchChildren();
+    _initSessionsStream();
+    _searchController.addListener(_onSearchChanged);
+  }
+
+  @override
+  void dispose() {
+    _searchController.removeListener(_onSearchChanged);
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged() {
+    setState(() {
+      _searchQuery = _searchController.text.toLowerCase();
+    });
   }
 
   Future<void> _fetchChildren() async {
     try {
-      // QuerySnapshot childrenSnapshot = await FirebaseFirestore.instance
-      //     .collection('children')
-      //     .get();
       final response = await supabase.from('clients').select().order('First Name');
-
-      Map<String, String> childrenMap = {};
+      final Map<String, String> childrenMap = {};
       for (final row in response) {
         final String firstName = row['First Name'] ?? '';
         final String lastName = row['Last Name'] ?? '';
-
         childrenMap[row['ID']] = '$firstName $lastName'.trim();
       }
-      // for (var doc in childrenSnapshot.docs) {
-      //   var data = doc.data() as Map<String, dynamic>;
-      //   String childId = doc.id;
-      //   String childName = data['childName'] ?? 'Unknown Client';
-      //   childrenMap[childId] = childName;
-      // }
-
-      setState(() {
-        _childrenMap = childrenMap;
-        _isLoadingChildren = false;
-      });
+      if (mounted) {
+        setState(() {
+          _childrenMap = childrenMap;
+          _isChildrenLoading = false;
+        });
+      }
     } catch (e) {
-      print('Error fetching children: $e');
-      setState(() {
-        _isLoadingChildren = false;
-      });
+      debugPrint('Error fetching children: $e');
     }
   }
 
-  // Stream<QuerySnapshot> _getSessionsStream() {
-  //   if (_selectedChildId == 'all') {
-  //     return FirebaseFirestore.instance
-  //         .collection('sessions')
-  //         .orderBy('createdAt', descending: true)
-  //         .snapshots();
-  //   } else {
-  //     return FirebaseFirestore.instance
-  //         .collection('sessions')
-  //         .where('childId', isEqualTo: _selectedChildId)
-  //         .orderBy('createdAt', descending: true)
-  //         .snapshots();
-  //   }
-  // }
-  Future<List<Map<String, dynamic>>> _fetchSessions() async {
-    if (_selectedChildId == 'all') {
-      return await supabase
-          .from('sessions')
-          .select('id, child_id, created_at')
-          .order('created_at', ascending: false);
-    }
-
-    return await supabase
+  void _initSessionsStream() {
+    _sessionsStream = supabase
         .from('sessions')
-        .select('id, child_id, created_at')
-        .eq('child_id', _selectedChildId)
+        .stream(primaryKey: ['id'])
         .order('created_at', ascending: false);
   }
 
-  String _getChildNameById(String childId) {
-    return _childrenMap[childId] ?? 'Unknown Client';
+  Color _getStatusColor(String status) {
+
+    switch (status) {
+      case 'error':
+        return Colors.red;
+      case 'loading':
+        return Colors.orange;
+      case 'completed':
+        return Colors.green;
+      case 'pending':
+        return Colors.blue;
+      default:
+        return Colors.grey;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
-      appBar: CustomAppBar(title: 'Sessions', showBack: true,),
-      body: Column(
+      appBar: CustomAppBar(
+        title: 'Sessions',
+        showBack: true,
+      ),
+      body: _isChildrenLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
         children: [
-          // Dropdown Filter
-          Container(
-            padding: const EdgeInsets.all(16),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey[300]!),
               ),
-              child: _isLoadingChildren
-                  ? const Padding(
-                padding: EdgeInsets.symmetric(vertical: 16),
-                child: Center(
-                  child: SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.black54),
-                    ),
-                  ),
+              child: TextField(
+                controller: _searchController,
+                style: const TextStyle(fontSize: 14),
+                cursorColor: Colors.black,
+                decoration: InputDecoration(
+                  hintText: 'Search by client name...',
+                  hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
+                  prefixIcon: Icon(Icons.search, color: Colors.grey[400], size: 20),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                    icon: Icon(Icons.clear, color: Colors.grey[400], size: 20),
+                    onPressed: () => _searchController.clear(),
+                  )
+                      : null,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 ),
-              )
-                  : DropdownButton<String>(
-                value: _selectedChildId,
-                isExpanded: true,
-                underline: const SizedBox(),
-                icon: const Icon(Icons.arrow_drop_down, color: Colors.black87),
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.black87,
-                ),
-                items: [
-                  const DropdownMenuItem<String>(
-                    value: 'all',
-                    child: Text('All Clients'),
-                  ),
-                  ..._childrenMap.entries.map((entry) {
-                    return DropdownMenuItem<String>(
-                      value: entry.key,
-                      child: Text(entry.value),
-                    );
-                  }).toList(),
-                ],
-                onChanged: (String? newValue) {
-                  if (newValue != null) {
-                    setState(() {
-                      _selectedChildId = newValue;
-                      _selectedChildName = newValue == 'all'
-                          ? 'All Clients'
-                          : _childrenMap[newValue] ?? 'Unknown Client';
-                    });
-                  }
-                },
               ),
             ),
           ),
 
-          // Sessions List
           Expanded(
-            child: FutureBuilder<List<Map<String, dynamic>>>(
-              future: _fetchSessions(),
+            child: StreamBuilder<List<Map<String, dynamic>>>(
+              stream: _sessionsStream,
               builder: (context, snapshot) {
+                // 1. Check for errors
                 if (snapshot.hasError) {
-                  return Center(
-                    child: Text(
-                      'Error loading sessions',
-                      style: const TextStyle(color: Colors.red),
-                    ),
-                  );
+                  return Center(child: Text('Error: ${snapshot.error}'));
                 }
 
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(
-                    child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.black54),
-                    ),
-                  );
+                // 2. Check for loading state
+                if (!snapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator());
                 }
 
-                final sessions = snapshot.data ?? [];
-                if (sessions.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.mic_none,
-                          size: 64,
-                          color: Colors.grey[400],
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          _selectedChildId == 'all'
-                              ? 'No sessions yet'
-                              : 'No sessions for $_selectedChildName',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Start by recording a session',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[500],
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
+                // 3. Filter the stream data locally based on search query
+                final allSessions = snapshot.data!;
+                final filteredSessions = allSessions.where((session) {
+                  final childId = session['child_id'] ?? '';
+                  final childName = _childrenMap[childId] ?? 'Unknown';
+                  return childName.toLowerCase().contains(_searchQuery);
+                }).toList();
+
+                // 4. Handle Empty State
+                if (filteredSessions.isEmpty) {
+                  return _buildEmptyState();
                 }
 
+                // 5. Build the List
                 return ListView.builder(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: sessions.length,
+                  itemCount: filteredSessions.length,
                   itemBuilder: (context, index) {
-                    final sessionData = sessions[index];
-                    String childId = sessionData['child_id'] ?? '';
-                    final childName = _childrenMap[childId] ?? 'Unknown Client';
-                    // Timestamp? timestamp = sessionData['created_at'];
+                    final sessionData = filteredSessions[index];
+                    final String childId = sessionData['child_id'] ?? '';
+                    final bool isError = sessionData['generating_report_error'] ?? false;
+                    final bool isLoadingReport = sessionData['generating_report'] ?? false;
+                    final String? audioUrl = sessionData['audio_url'];
+                    final List? tracks = sessionData['tracks'];
 
+                    String status = 'initial';
+
+                    if (isError) {
+                      status = 'error';
+                    } else if (isLoadingReport) {
+                      status = 'loading';
+                    } else if (audioUrl != null && audioUrl.isNotEmpty) {
+                      status = 'completed';
+                    } else if (tracks != null && tracks.isNotEmpty) {
+                      status = 'pending';
+                    } else {
+                      status = 'initial';
+                    }
+
+                    final childName = _childrenMap[childId] ?? 'Unknown';
                     final DateTime createdAt = DateTime.parse(sessionData['created_at']);
                     final dateStr = '${createdAt.day}/${createdAt.month}/${createdAt.year}';
 
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: ListTile(
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
-                          leading: CircleAvatar(
-                            radius: 20,
-                            backgroundColor: const Color(0xFF00C4B3),
-                            child: const Icon(
-                              Icons.mic,
-                              color: Colors.black87,
-                              size: 20,
-                            ),
-                          ),
-                          title: Text(
-                            childName,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.black87,
-                            ),
-                          ),
-                          trailing: Text(
-                            dateStr,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                          onTap: () {
-                            // Navigate to session details
-                            print('Tapped on session: $childName');
-                            Navigator.push(context, MaterialPageRoute(builder: (context) => SessionDetailsScreen(sessionId: sessionData['id'],), ),);
-                          },
-                        ),
-                      ),
-                    );
+                    return _buildSessionCard(sessionData, childName, dateStr, status);
                   },
                 );
               },
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSessionCard(Map<String, dynamic> sessionData, String childName, String dateStr, String status) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          leading: Stack(
+            children: [
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: const Color(0xFF00C4B3),
+                child: const Icon(Icons.mic, color: Colors.black87, size: 20),
+              ),
+              Positioned(
+                right: 0,
+                bottom: 0,
+                child: Container(
+                  height: 12,
+                  width: 12,
+                  decoration: BoxDecoration(
+                    color: _getStatusColor(status),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 2),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          title: Text(
+            childName,
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Colors.black87),
+          ),
+          trailing: Text(
+            dateStr,
+            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+          ),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => SessionDetailsScreen(sessionId: sessionData['id']),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(_searchQuery.isEmpty ? Icons.mic_none : Icons.search_off, size: 64, color: Colors.grey[400]),
+          const SizedBox(height: 16),
+          Text(_searchQuery.isEmpty ? 'No sessions yet' : 'No sessions found',
+              style: TextStyle(fontSize: 16, color: Colors.grey[600])),
         ],
       ),
     );
