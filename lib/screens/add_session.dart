@@ -126,17 +126,17 @@ class _AddSessionScreenState extends State<AddSessionScreen> {
         return;
       }
 
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => RecordingSessionScreen(
-            childId: _selectedChildId!,
-            childName: _selectedChildName!,
-            // parentName: _parentNameController.text.trim(),
-            tracks: _selectedTracks,
-          ),
-        ),
-      );
+      // Navigator.push(
+      //   context,
+      //   MaterialPageRoute(
+      //     builder: (context) => RecordingSessionScreen(
+      //       childId: _selectedChildId!,
+      //       childName: _selectedChildName!,
+      //       // parentName: _parentNameController.text.trim(),
+      //       tracks: _selectedTracks,
+      //     ),
+      //   ),
+      // );
     }
   }
 

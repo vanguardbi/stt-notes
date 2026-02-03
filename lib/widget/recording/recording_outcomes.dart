@@ -128,7 +128,7 @@ class _RecordingOutcomesViewState extends State<RecordingOutcomesView> {
                     //     });
                     //   },
                     // ),
-                    child: CustomButton(text: 'Generate Transcript', onPressed: widget.onGenerateTranscript,),
+                    child: CustomButton(text: 'Generate Transcript and Continue', onPressed: widget.onGenerateTranscript,),
                   ),
               ],
             ),

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:stt/screens/session_details.dart';
 import 'package:stt/screens/sessions.dart';
 import 'package:stt/widget/custom_appbar.dart';
@@ -55,14 +54,6 @@ class _ChildDetailsScreenState extends State<ChildDetailsScreen> {
     }
   }
 
-  // Stream<QuerySnapshot> _getSessionsStream() {
-  //   return FirebaseFirestore.instance
-  //       .collection('sessions')
-  //       .where('childId', isEqualTo: widget.childId)
-  //       .orderBy('createdAt', descending: true)
-  //       .snapshots();
-  // }
-
   Future<void> _loadSessions() async {
     try {
       final response = await supabase
@@ -96,7 +87,7 @@ class _ChildDetailsScreenState extends State<ChildDetailsScreen> {
       }
     }
 
-    return sessionData['track'] ?? 'Unknown Track';
+    return sessionData['track'] ?? 'Unspecified Track';
   }
 
   String _getTrackInitial(Map<String, dynamic> sessionData) {
@@ -104,33 +95,6 @@ class _ChildDetailsScreenState extends State<ChildDetailsScreen> {
     final firstChar = trackName.trim().isNotEmpty ? trackName.trim()[0] : 'S';
     return firstChar.toUpperCase();
   }
-
-  // List<QueryDocumentSnapshot> _filterSessions(List<QueryDocumentSnapshot> allSessions) {
-  //   if (selectedTrack == 'All Tracks') {
-  //     return allSessions;
-  //   }
-  //
-  //   return allSessions.where((sessionDoc) {
-  //     final sessionData = sessionDoc.data() as Map<String, dynamic>;
-  //
-  //     final oldTrack = sessionData['track'] as String?;
-  //     if (oldTrack != null && oldTrack == selectedTrack) {
-  //       return true;
-  //     }
-  //
-  //     final newTracks = sessionData['tracks'] as List<dynamic>?;
-  //     if (newTracks != null) {
-  //       return newTracks.any((trackData) {
-  //         if (trackData is Map<String, dynamic>) {
-  //           return trackData['trackName'] == selectedTrack;
-  //         }
-  //         return false;
-  //       });
-  //     }
-  //
-  //     return false;
-  //   }).toList();
-  // }
 
   List<Map<String, dynamic>> _filteredSessions() {
     if (selectedTrack == 'All Tracks') {
@@ -158,7 +122,7 @@ class _ChildDetailsScreenState extends State<ChildDetailsScreen> {
           .join(', ');
     }
 
-    return 'Unknown Track';
+    return 'Unspecified Track';
   }
 
   String _trackInitial(String name) {
@@ -259,122 +223,6 @@ class _ChildDetailsScreenState extends State<ChildDetailsScreen> {
             ),
           ),
 
-          // Sessions List (StreamBuilder now uses _getSessionsStream and filters data)
-          // Expanded(
-          //   child: StreamBuilder<QuerySnapshot>(
-          //     stream: _getSessionsStream(),
-          //     builder: (context, snapshot) {
-          //       if (snapshot.hasError) {
-          //         return Center(
-          //           child: Text(
-          //             'Error: ${snapshot.error}',
-          //             style: const TextStyle(color: Colors.red),
-          //           ),
-          //         );
-          //       }
-          //
-          //       if (snapshot.connectionState == ConnectionState.waiting) {
-          //         return const Center(
-          //           child: CircularProgressIndicator(
-          //             valueColor: AlwaysStoppedAnimation<Color>(Colors.black54),
-          //           ),
-          //         );
-          //       }
-          //
-          //       final filteredDocs = _filterSessions(snapshot.data!.docs);
-          //
-          //       if (filteredDocs.isEmpty) {
-          //         return Center(
-          //           child: Column(
-          //             mainAxisAlignment: MainAxisAlignment.center,
-          //             children: [
-          //               Icon(
-          //                 Icons.folder_open,
-          //                 size: 64,
-          //                 color: Colors.grey[400],
-          //               ),
-          //               const SizedBox(height: 16),
-          //               Text(
-          //                 selectedTrack != 'All Tracks'
-          //                     ? 'No sessions for $selectedTrack'
-          //                     : 'No sessions yet',
-          //                 style: TextStyle(
-          //                   fontSize: 16,
-          //                   color: Colors.grey[600],
-          //                 ),
-          //               ),
-          //             ],
-          //           ),
-          //         );
-          //       }
-          //
-          //       return ListView.builder(
-          //         padding: const EdgeInsets.symmetric(horizontal: 16),
-          //         itemCount: filteredDocs.length,
-          //         itemBuilder: (context, index) {
-          //           var sessionDoc = filteredDocs[index];
-          //           var sessionData = sessionDoc.data() as Map<String, dynamic>;
-          //
-          //           String displayTrack = _getDisplayTrackName(sessionData);
-          //           String trackInitial = _getTrackInitial(sessionData);
-          //
-          //           Timestamp? timestamp = sessionData['createdAt'];
-          //           String dateStr = timestamp != null
-          //               ? '${timestamp.toDate().day}/${timestamp.toDate().month}/${timestamp.toDate().year}'
-          //               : '';
-          //
-          //           return Padding(
-          //             padding: const EdgeInsets.only(bottom: 12),
-          //             child: Container(
-          //               decoration: BoxDecoration(
-          //                 color: Colors.white,
-          //                 borderRadius: BorderRadius.circular(8),
-          //               ),
-          //               child: ListTile(
-          //                 contentPadding: const EdgeInsets.symmetric(
-          //                   horizontal: 16,
-          //                   vertical: 8,
-          //                 ),
-          //                 leading: CircleAvatar(
-          //                   radius: 20,
-          //                   backgroundColor: const Color(0xFF00C4B3),
-          //                   child: Text(
-          //                     trackInitial,
-          //                     style: const TextStyle(
-          //                       color: Colors.black87,
-          //                       fontSize: 16,
-          //                       fontWeight: FontWeight.w500,
-          //                     ),
-          //                   ),
-          //                 ),
-          //                 title: Text(
-          //                   displayTrack,
-          //                   style: const TextStyle(
-          //                     fontSize: 14,
-          //                     fontWeight: FontWeight.w500,
-          //                     color: Colors.black87,
-          //                   ),
-          //                 ),
-          //                 trailing: Text(
-          //                   dateStr,
-          //                   style: TextStyle(
-          //                     fontSize: 12,
-          //                     color: Colors.grey[600],
-          //                   ),
-          //                 ),
-          //                 onTap: () {
-          //                   // Navigate to session details
-          //                   print('Tapped on session: $displayTrack');
-          //                   Navigator.push(context, MaterialPageRoute(builder: (context) => SessionDetailsScreen(sessionId: sessionDoc.id,), ),);
-          //                 },
-          //               ),
-          //             ),
-          //           );
-          //         },
-          //       );
-          //     },
-          //   ),
-          // ),
           Expanded(
             child: isLoadingSessions
                 ? const Center(child: CircularProgressIndicator())

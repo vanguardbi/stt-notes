@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:sound_stream/sound_stream.dart';
+import 'package:stt/screens/sessions.dart';
 import 'package:stt/utils/utils.dart';
 import 'package:stt/widget/custom_appbar.dart';
 import 'package:stt/widget/recording/generated_transcript.dart';
@@ -27,14 +28,14 @@ import 'package:web_socket_channel/io.dart';
 class RecordingSessionScreen extends StatefulWidget {
   final String childId;
   final String childName;
-  // final String parentName;
+  final String sessionId;
   final List<TrackWithObjectives> tracks;
 
   const RecordingSessionScreen({
     Key? key,
     required this.childId,
     required this.childName,
-    // required this.parentName,
+    required this.sessionId,
     required this.tracks,
   }) : super(key: key);
 
@@ -72,7 +73,6 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
   String? _sessionOutcomes;
   String? _nextSessionPlans;
   bool _sessionSaved = false;
-  String? _sessionId;
   int _recordingDuration = 0;
   bool _isGeneratingTranscript = false;
   bool _isSavingSession = false;
@@ -294,26 +294,17 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
       final uploadTask = await storageRef.putFile(File(_recordedFilePath!));
       _downloadURL = await uploadTask.ref.getDownloadURL();
 
-      final tracksData = widget.tracks.map((track) => track.toMap()).toList();
-
-      final response = await _supabase.from('sessions').insert({
-        'child_id': widget.childId,
-        'child_name': widget.childName,
-        // 'parent_name': widget.parentName,
-        'tracks': tracksData,
+      await _supabase.from('sessions').update({
         'audio_url': _downloadURL,
-        'duration': _recordingDuration ~/ 1000,
+        'recording_duration': _recordingDuration ~/ 1000,
         'transcript': _transcriptText,
         'notes': _notesController.text.trim(),
         'created_by': user.id,
-        'created_at': DateTime.now().toIso8601String(),
-      }).select().single();
-
-      _sessionId = response['id'];
-      print('Session saved with ID: $_sessionId');
+        'child_name': widget.childName,
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('id', widget.sessionId);
 
       setState(() {
-        _sessionId = response['id'];
         _isSavingSession = false;
       });
 
@@ -335,17 +326,7 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
   }
 
   Future<void> generateTranscript() async {
-    print(_transcriptText);
-    // return;
-    if (_sessionId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please start your session again'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
+    // print('_transcriptText $_transcriptText');
 
     setState(() {
       _currentStage = RecordingStage.generatingTranscript;
@@ -354,6 +335,11 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
 
     try {
       print('Calling Cloud Function...');
+
+      await _supabase.from('sessions').update({
+        'generating_report': true,
+      }).eq('id', widget.sessionId);
+
       const functionUrl = String.fromEnvironment('FUNCTION_URL');
 
       if (functionUrl.isEmpty) {
@@ -377,7 +363,7 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
       final tracksData = widget.tracks.map((track) => track.toMap()).toList();
       final plans = _plansController.text.trim();
 
-      final response = await http.post(
+      http.post(
         Uri.parse(functionUrl),
         headers: {
           'Content-Type': 'application/json',
@@ -386,45 +372,25 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
         body: jsonEncode({
           'transcript': _transcriptText,
           'childId': widget.childId,
-          'sessionId': _sessionId,
+          'sessionId': widget.sessionId,
           'name': widget.childName,
           'tracks': tracksData,
           'nextSessionPlans': plans,
           'sessionNotes': _notesController.text.trim()
         }),
-      );
-
-      final result = jsonDecode(response.body);
-
-      // Check if success is true
-      if (result['success'] != true) {
-        print('Error gt checking');
-        setState(() {
-          _currentStage = RecordingStage.detailsUpdate;
-          _isGeneratingTranscript = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error generating transcript'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
-      }
-
-      // Extract transcript from result
-      final transcript = result['transcript'] ?? '';
-      final transcriptConvo = result['formattedConversation'] ?? '';
-      final aiSummary = result['summary'] ?? '';
-      final docUrl = result['url'] ?? '';
-
-      setState(() {
-        _transcriptText = transcriptConvo;
-        _docUrl = docUrl;
-        _aiSummary = aiSummary;
-        _currentStage = RecordingStage.transcriptGenerated;
-        _isGeneratingTranscript = false;
+      ).then((response) {
+        print('Background processing finished: ${response.statusCode}');
+      }).catchError((e) {
+        print('Background processing failed: $e');
       });
+
+      if (mounted) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const SessionsScreen()),
+              (route) => false,
+        );
+      }
 
     } catch (e) {
       print('Error generating transcript: $e');
@@ -433,16 +399,6 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
         _isGeneratingTranscript = false;
         _currentStage = RecordingStage.detailsUpdate;
       });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error generating transcript'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 5),
-          ),
-        );
-      }
     }
   }
 
@@ -480,7 +436,7 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
         'outcomes': outcomes,
         'next_session_plans': plans,
         'updated_at': DateTime.now().toIso8601String(),
-      }).eq('id', _sessionId!);
+      }).eq('id', widget.sessionId);
 
       setState(() {
         _nextSessionPlans = plans;
@@ -614,7 +570,6 @@ class _RecordingSessionScreenState extends State<RecordingSessionScreen> {
   Widget _buildViewSessionView() {
     return ViewSessionView(
         childName: widget.childName,
-        // parentName: widget.parentName,
         notes: '',
         downloadURL: _downloadURL,
         transcriptText: _transcriptText,
